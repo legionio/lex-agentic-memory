@@ -1,0 +1,55 @@
+# lex-agentic-memory
+
+**Parent**: `/Users/miverso2/rubymine/legion/extensions-agentic/CLAUDE.md`
+
+## What Is This Gem?
+
+Domain consolidation gem for memory storage, retrieval, and consolidation. Bundles 18 source extensions into one loadable unit under `Legion::Extensions::Agentic::Memory`.
+
+**Gem**: `lex-agentic-memory`
+**Version**: 0.1.0
+**Namespace**: `Legion::Extensions::Agentic::Memory`
+
+## Sub-Modules
+
+| Sub-Module | Source Gem | Purpose |
+|---|---|---|
+| `Memory::Trace` | `lex-memory` | Memory trace storage, power-law decay, Hebbian association, tiered retrieval |
+| `Memory::Episodic` | `lex-episodic-buffer` | Baddeley & Hitch episodic buffer — integrates working memory channels |
+| `Memory::Semantic` | `lex-semantic-memory` | Long-term conceptual knowledge — spreading activation |
+| `Memory::SemanticPriming` | `lex-semantic-priming` | Prior exposure boosts retrieval speed for related concepts |
+| `Memory::SemanticSatiation` | `lex-semantic-satiation` | Repeated activation reduces salience — cognitive desensitization |
+| `Memory::SourceMonitoring` | `lex-source-monitoring` | Attribution of memories to origin source |
+| `Memory::Transfer` | `lex-transfer-learning` | Knowledge transfer between domains |
+| `Memory::Archaeology` | `lex-cognitive-archaeology` | Excavates dormant or deeply buried traces |
+| `Memory::Paleontology` | `lex-cognitive-paleontology` | Excavating old knowledge layers |
+| `Memory::Palimpsest` | `lex-cognitive-palimpsest` | Layered memory overwriting — recovering original layers |
+| `Memory::Compression` | `lex-cognitive-compression` | Memory compression for storage efficiency |
+| `Memory::Hologram` | `lex-cognitive-hologram` | Distributed memory storage with holographic properties |
+| `Memory::Offloading` | `lex-cognitive-offloading` | Externalizing memory to reduce cognitive load |
+| `Memory::Nostalgia` | `lex-cognitive-nostalgia` | Nostalgic retrieval bias — past warmth enhancement |
+| `Memory::Echo` | `lex-cognitive-echo` | Echo/resonance of past experiences |
+| `Memory::EchoChamber` | `lex-cognitive-echo-chamber` | Self-reinforcing memory patterns |
+| `Memory::ImmuneMemory` | `lex-cognitive-immune-memory` | Immune-style memory for threat patterns |
+| `Memory::Reserve` | `lex-cognitive-reserve` | Cognitive reserve capacity |
+
+## Singleton Store Pattern
+
+`Memory::Trace` uses a process-wide singleton store (`Memory::Trace.shared_store`). All runners share this store. Call `Memory::Trace.reset_store!` in spec `before(:each)` for test isolation.
+
+## Actors
+
+- `Memory::Trace::Actors::Decay` — runs every 60s, executes `decay_cycle`
+- `Memory::Trace::Actors::TierMigration` — runs every 300s, migrates traces between tiers
+
+## Tick Integration
+
+`Memory::Trace` maps to `memory_retrieval` (via `retrieve_and_reinforce`) and `memory_consolidation` (via `decay_cycle`) tick phases.
+
+## Development
+
+```bash
+bundle install
+bundle exec rspec        # 1778 examples, 0 failures
+bundle exec rubocop      # 0 offenses
+```

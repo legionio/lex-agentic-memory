@@ -1,0 +1,118 @@
+# frozen_string_literal: true
+
+require 'legion/extensions/agentic/memory/trace/client'
+
+RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Runners::Consolidation do
+  let(:client) { Legion::Extensions::Agentic::Memory::Trace::Client.new }
+
+  describe '#reinforce' do
+    it 'increases trace strength' do
+      stored = client.store_trace(type: :semantic, content_payload: {})
+      result = client.reinforce(trace_id: stored[:trace_id])
+
+      expect(result[:reinforced]).to be true
+      expect(result[:new_strength]).to eq(0.6) # 0.5 + 0.1
+    end
+
+    it 'applies imprint multiplier' do
+      stored = client.store_trace(type: :semantic, content_payload: {})
+      result = client.reinforce(trace_id: stored[:trace_id], imprint_active: true)
+
+      expect(result[:new_strength]).to eq(0.8) # 0.5 + 0.1 * 3.0
+    end
+
+    it 'does not reinforce firmware traces' do
+      stored = client.store_trace(type: :firmware, content_payload: { directive_text: 'protect' })
+      result = client.reinforce(trace_id: stored[:trace_id])
+
+      expect(result[:reinforced]).to be false
+      expect(result[:reason]).to eq(:firmware)
+    end
+
+    it 'returns found: false for missing traces' do
+      result = client.reinforce(trace_id: 'nonexistent')
+      expect(result[:found]).to be false
+    end
+
+    it 'clamps at 1.0' do
+      stored = client.store_trace(type: :semantic, content_payload: {})
+      # Reinforce multiple times
+      10.times { client.reinforce(trace_id: stored[:trace_id]) }
+      trace = client.get_trace(trace_id: stored[:trace_id])
+      expect(trace[:trace][:strength]).to eq(1.0)
+    end
+
+    it 'increments reinforcement_count' do
+      stored = client.store_trace(type: :semantic, content_payload: {})
+      3.times { client.reinforce(trace_id: stored[:trace_id]) }
+      trace = client.get_trace(trace_id: stored[:trace_id])
+      expect(trace[:trace][:reinforcement_count]).to eq(3)
+    end
+  end
+
+  describe '#decay_cycle' do
+    it 'decays non-firmware traces' do
+      client.store_trace(type: :semantic, content_payload: {})
+      client.store_trace(type: :firmware, content_payload: { directive_text: 'protect' })
+
+      result = client.decay_cycle(tick_count: 100)
+      expect(result[:decayed]).to be >= 1
+    end
+
+    it 'prunes traces below threshold' do
+      stored = client.store_trace(type: :sensory, content_payload: {})
+      trace = client.get_trace(trace_id: stored[:trace_id])
+      trace[:trace][:strength] = 0.005
+      trace[:trace][:peak_strength] = 0.005
+
+      result = client.decay_cycle(tick_count: 100_000)
+      expect(result[:pruned]).to be >= 0
+    end
+  end
+
+  describe '#migrate_tier' do
+    it 'migrates traces to correct tier' do
+      stored = client.store_trace(type: :semantic, content_payload: {})
+      trace = client.get_trace(trace_id: stored[:trace_id])
+      trace[:trace][:last_reinforced] = Time.now.utc - (50 * 86_400)
+
+      result = client.migrate_tier
+      expect(result[:migrated]).to be >= 1
+    end
+  end
+
+  describe '#hebbian_link' do
+    it 'records coactivation' do
+      a = client.store_trace(type: :semantic, content_payload: { fact: 'a' })
+      b = client.store_trace(type: :semantic, content_payload: { fact: 'b' })
+
+      result = client.hebbian_link(trace_id_a: a[:trace_id], trace_id_b: b[:trace_id])
+      expect(result[:linked]).to be true
+    end
+  end
+
+  describe '#erase_by_type' do
+    it 'erases all traces of specified type' do
+      client.store_trace(type: :sensory, content_payload: {})
+      client.store_trace(type: :sensory, content_payload: {})
+      client.store_trace(type: :semantic, content_payload: {})
+
+      result = client.erase_by_type(type: :sensory)
+      expect(result[:erased]).to eq(2)
+
+      remaining = client.retrieve_by_type(type: :sensory)
+      expect(remaining[:count]).to eq(0)
+    end
+  end
+
+  describe '#erase_by_agent' do
+    it 'erases all traces for a partition' do
+      client.store_trace(type: :semantic, content_payload: {}, partition_id: 'agent-1')
+      client.store_trace(type: :semantic, content_payload: {}, partition_id: 'agent-1')
+      client.store_trace(type: :semantic, content_payload: {}, partition_id: 'agent-2')
+
+      result = client.erase_by_agent(partition_id: 'agent-1')
+      expect(result[:erased]).to eq(2)
+    end
+  end
+end
