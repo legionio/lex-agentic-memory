@@ -7,7 +7,7 @@
 Domain consolidation gem for memory storage, retrieval, and consolidation. Bundles 18 source extensions into one loadable unit under `Legion::Extensions::Agentic::Memory`.
 
 **Gem**: `lex-agentic-memory`
-**Version**: 0.1.0
+**Version**: 0.1.1
 **Namespace**: `Legion::Extensions::Agentic::Memory`
 
 ## Sub-Modules
@@ -50,6 +50,6 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 
 ```bash
 bundle install
-bundle exec rspec        # 1778 examples, 0 failures
+bundle exec rspec        # 1780 examples, 0 failures
 bundle exec rubocop      # 0 offenses
 ```

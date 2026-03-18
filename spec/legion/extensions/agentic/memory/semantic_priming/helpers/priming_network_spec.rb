@@ -18,6 +18,18 @@ RSpec.describe Legion::Extensions::Agentic::Memory::SemanticPriming::Helpers::Pr
       found = network.find_node_by_label(label: 'stored')
       expect(found.id).to eq(node.id)
     end
+
+    it 'rejects invalid node_type' do
+      expect(network.add_node(label: 'bad', node_type: :kinesthetic)).to be_nil
+    end
+
+    it 'accepts all valid NODE_TYPES' do
+      constants = Legion::Extensions::Agentic::Memory::SemanticPriming::Helpers::Constants
+      constants::NODE_TYPES.each do |nt|
+        node = network.add_node(label: "node_#{nt}", node_type: nt)
+        expect(node).not_to be_nil
+      end
+    end
   end
 
   describe '#remove_node' do

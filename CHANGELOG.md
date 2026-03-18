@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-18
+
+### Changed
+- Enforce NODE_TYPES validation in SemanticPriming::PrimingNetwork#add_node (returns nil for invalid types)
+
 ## [0.1.0] - 2026-03-18
 
 ### Added

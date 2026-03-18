@@ -16,6 +16,8 @@ module Legion
               end
 
               def add_node(label:, node_type: :concept)
+                return nil unless NODE_TYPES.include?(node_type)
+
                 prune_nodes_if_needed
                 node = SemanticNode.new(label: label, node_type: node_type)
                 @nodes[node.id] = node
