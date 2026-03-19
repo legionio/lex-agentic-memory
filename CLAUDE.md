@@ -39,6 +39,9 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 
 ## Actors
 
+- `Memory::Episodic::Actors::Decay` — interval actor, decays episodic buffer entries
+- `Memory::Semantic::Actors::Decay` — interval actor, decays semantic memory activation
+- `Memory::SourceMonitoring::Actors::Decay` — interval actor, decays source monitoring confidence
 - `Memory::Trace::Actors::Decay` — runs every 60s, executes `decay_cycle`
 - `Memory::Trace::Actors::TierMigration` — runs every 300s, migrates traces between tiers
 
