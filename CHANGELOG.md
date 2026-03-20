@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.2] - 2026-03-20
+
+### Added
+- `Trace::Helpers::Snapshot`: cognitive state persistence with MessagePack serialization and SHA-512/Ed25519 signing
+- Snapshot save, restore, list, and prune operations with auto-prune on save
+- GAIA lifecycle hooks: auto-save on `service.shutting_down`, auto-restore on `gaia.started`
+- `msgpack` gem dependency
 
 ## [0.1.1] - 2026-03-18
 
