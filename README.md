@@ -49,7 +49,7 @@ gem 'lex-agentic-memory'
 
 ```bash
 bundle install
-bundle exec rspec        # 1780 examples, 0 failures
+bundle exec rspec        # 1795 examples, 0 failures
 bundle exec rubocop      # 0 offenses
 ```
 
