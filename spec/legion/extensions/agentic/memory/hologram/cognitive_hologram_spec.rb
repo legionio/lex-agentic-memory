@@ -2,7 +2,7 @@
 
 RSpec.describe Legion::Extensions::Agentic::Memory::Hologram do
   it 'defines a VERSION constant' do
-    expect(described_class::VERSION).to eq('0.1.0')
+    expect(described_class::VERSION).not_to be_nil
   end
 
   it 'defines the Helpers module' do

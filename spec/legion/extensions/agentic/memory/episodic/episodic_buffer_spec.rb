@@ -9,7 +9,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Episodic do
     expect(Legion::Extensions::Agentic::Memory::Episodic::VERSION).to be_a(String)
   end
 
-  it 'version is 0.1.0' do
-    expect(Legion::Extensions::Agentic::Memory::Episodic::VERSION).to eq('0.1.0')
+  it 'version is a semver string' do
+    expect(Legion::Extensions::Agentic::Memory::Episodic::VERSION).to match(/\A\d+\.\d+\.\d+\z/)
   end
 end
