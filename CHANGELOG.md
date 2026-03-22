@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.3] - 2026-03-22
+
+### Fixed
+- Fix `Trace::Helpers::Decay` crash when `last_reinforced` is a String after cache round-trip (added `ensure_time` coercion in `compute_storage_tier` and `compute_retrieval_score`)
+
 ## [0.1.2] - 2026-03-20
 
 ### Added

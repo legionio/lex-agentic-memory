@@ -34,7 +34,7 @@ module Legion
               # score = strength * recency_factor * emotional_weight * (1 + association_bonus)
               def compute_retrieval_score(trace:, query_time: nil, associated: false, **)
                 query_time ||= Time.now.utc
-                seconds_since = [query_time - trace[:last_reinforced], 0].max
+                seconds_since = [query_time - ensure_time(trace[:last_reinforced]), 0].max
                 half_life = Helpers::Trace::RETRIEVAL_RECENCY_HALF.to_f
 
                 recency_factor = 2.0**(-seconds_since / half_life)
@@ -47,7 +47,7 @@ module Legion
               # Determine storage tier based on last access time
               def compute_storage_tier(trace:, now: nil, **)
                 now ||= Time.now.utc
-                seconds_since = now - trace[:last_reinforced]
+                seconds_since = now - ensure_time(trace[:last_reinforced])
 
                 if trace[:strength] <= Helpers::Trace::PRUNE_THRESHOLD
                   :erased
@@ -58,6 +58,13 @@ module Legion
                 else
                   :cold
                 end
+              end
+
+              def ensure_time(value)
+                return value if value.is_a?(Time)
+                return Time.parse(value) if value.is_a?(String)
+
+                Time.now.utc
               end
             end
           end
