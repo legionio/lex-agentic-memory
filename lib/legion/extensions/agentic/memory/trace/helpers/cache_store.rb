@@ -7,27 +7,32 @@ module Legion
         module Trace
           module Helpers
             # Cache-backed store using Legion::Cache (Memcached/Redis).
-            # Keeps a local copy in memory, syncs to/from cache on load/flush.
-            # Call `flush` after a batch of writes, or it auto-flushes when dirty.
-            # Call `reload` to pull latest state from cache (e.g. after another process wrote).
+            # Each trace is stored as an individual cache key for scalability.
+            # An index key tracks all known trace IDs.
+            # Keeps a local in-memory copy for fast reads; syncs to cache on flush.
             class CacheStore
-              TRACES_KEY = 'legion:memory:traces'
-              ASSOC_KEY  = 'legion:memory:associations'
-              TTL        = 86_400 # 24 hours
+              TRACE_PREFIX = 'legion:memory:trace:'
+              INDEX_KEY    = 'legion:memory:trace_index'
+              ASSOC_KEY    = 'legion:memory:associations'
+              TTL          = 86_400 # 24 hours
+              FLUSH_BATCH  = 500    # traces per flush batch
 
               attr_reader :traces, :associations
 
               def initialize
-                Legion::Logging.info '[memory] CacheStore initialized (memcached-backed)'
-                @traces       = Legion::Cache.get(TRACES_KEY) || {}
-                @associations = Legion::Cache.get(ASSOC_KEY) || {}
-                @dirty        = false
+                Legion::Logging.info '[memory] CacheStore initialized (memcached-backed, per-key)'
+                @traces       = {}
+                @associations = {}
+                @dirty_ids    = Set.new
+                @deleted_ids  = Set.new
+                @assoc_dirty  = false
+                load_index
                 Legion::Logging.info "[memory] CacheStore loaded #{@traces.size} traces from cache"
               end
 
               def store(trace)
                 @traces[trace[:trace_id]] = trace
-                @dirty = true
+                @dirty_ids << trace[:trace_id]
                 trace[:trace_id]
               end
 
@@ -39,7 +44,9 @@ module Legion
                 @traces.delete(trace_id)
                 @associations.delete(trace_id)
                 @associations.each_value { |links| links.delete(trace_id) }
-                @dirty = true
+                @dirty_ids.delete(trace_id)
+                @deleted_ids << trace_id
+                @assoc_dirty = true
               end
 
               def retrieve_by_type(type, min_strength: 0.0, limit: 100)
@@ -77,7 +84,7 @@ module Legion
 
                 threshold = Helpers::Trace::COACTIVATION_THRESHOLD
                 link_traces(trace_id_a, trace_id_b) if @associations[trace_id_a][trace_id_b] >= threshold
-                @dirty = true
+                @assoc_dirty = true
               end
 
               def all_traces(min_strength: 0.0)
@@ -121,25 +128,80 @@ module Legion
                 results
               end
 
-              # Write local state to cache
+              # Write dirty traces to cache as individual keys
               def flush
-                return unless @dirty
-
-                Legion::Cache.set(TRACES_KEY, @traces, TTL)
-                Legion::Cache.set(ASSOC_KEY, strip_default_procs(@associations), TTL)
-                @dirty = false
-                Legion::Logging.debug "[memory] CacheStore flushed #{@traces.size} traces to cache"
+                flush_deleted
+                flush_traces
+                flush_associations
+                flush_index
+                Legion::Logging.debug "[memory] CacheStore flushed #{@dirty_ids.size} dirty traces (#{@traces.size} total)"
+                @dirty_ids.clear
+                @deleted_ids.clear
               end
 
-              # Pull latest state from cache (after another process wrote)
+              # Pull latest state from cache
               def reload
-                @traces       = Legion::Cache.get(TRACES_KEY) || {}
-                @associations = Legion::Cache.get(ASSOC_KEY) || {}
-                @dirty        = false
+                @traces.clear
+                @associations = {}
+                @dirty_ids.clear
+                @deleted_ids.clear
+                @assoc_dirty = false
+                load_index
                 Legion::Logging.debug "[memory] CacheStore reloaded #{@traces.size} traces from cache"
               end
 
               private
+
+              def trace_key(trace_id)
+                "#{TRACE_PREFIX}#{trace_id}"
+              end
+
+              def load_index
+                index = Legion::Cache.get(INDEX_KEY)
+                return unless index.is_a?(Array)
+
+                loaded = 0
+                index.each do |id|
+                  trace = Legion::Cache.get(trace_key(id))
+                  if trace
+                    @traces[id] = trace
+                    loaded += 1
+                  end
+                end
+                Legion::Logging.debug "[memory] CacheStore loaded #{loaded}/#{index.size} traces from index" if defined?(Legion::Logging)
+              rescue StandardError => e
+                Legion::Logging.warn "[memory] CacheStore load_index failed: #{e.message}" if defined?(Legion::Logging)
+              end
+
+              def flush_traces
+                return if @dirty_ids.empty?
+
+                @dirty_ids.each_slice(FLUSH_BATCH) do |batch|
+                  batch.each do |id|
+                    trace = @traces[id]
+                    Legion::Cache.set(trace_key(id), trace, TTL) if trace
+                  end
+                end
+              end
+
+              def flush_deleted
+                @deleted_ids.each do |id|
+                  Legion::Cache.delete(trace_key(id))
+                end
+              end
+
+              def flush_associations
+                return unless @assoc_dirty
+
+                Legion::Cache.set(ASSOC_KEY, strip_default_procs(@associations), TTL)
+                @assoc_dirty = false
+              end
+
+              def flush_index
+                return if @dirty_ids.empty? && @deleted_ids.empty?
+
+                Legion::Cache.set(INDEX_KEY, @traces.keys, TTL)
+              end
 
               def strip_default_procs(hash)
                 hash.each_with_object({}) do |(k, v), plain|

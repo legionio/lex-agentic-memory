@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.6] - 2026-03-23
+
+### Fixed
+- Fix trace migration path registration (`'memory/local_migrations'` -> `'trace/local_migrations'`)
+- Refactor CacheStore from single-blob storage to per-trace individual cache keys with index, preventing OOM on flush
+
+### Changed
+- CacheStore now uses `legion:memory:trace:<uuid>` keys instead of serializing all traces into one key
+- Dirty set tracking replaces dirty flag for more efficient selective flushing
+- Batch flush in groups of 500 traces
+
 ## [0.1.5] - 2026-03-22
 
 ### Changed

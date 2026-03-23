@@ -47,7 +47,7 @@ module Legion
     if defined?(Legion::Data::Local)
       Legion::Data::Local.register_migrations(
         name: :memory,
-        path: File.join(__dir__, 'memory', 'local_migrations')
+        path: File.join(__dir__, 'trace', 'local_migrations')
       )
     end
   end
