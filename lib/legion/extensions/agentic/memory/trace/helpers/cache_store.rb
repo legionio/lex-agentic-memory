@@ -21,6 +21,7 @@ module Legion
 
               def initialize
                 Legion::Logging.info '[memory] CacheStore initialized (memcached-backed, per-key)'
+                @mutex        = Mutex.new
                 @traces       = {}
                 @associations = {}
                 @dirty_ids    = Set.new
@@ -31,8 +32,10 @@ module Legion
               end
 
               def store(trace)
-                @traces[trace[:trace_id]] = trace
-                @dirty_ids << trace[:trace_id]
+                @mutex.synchronize do
+                  @traces[trace[:trace_id]] = trace
+                  @dirty_ids << trace[:trace_id]
+                end
                 trace[:trace_id]
               end
 
@@ -41,26 +44,28 @@ module Legion
               end
 
               def delete(trace_id)
-                @traces.delete(trace_id)
-                @associations.delete(trace_id)
-                @associations.each_value { |links| links.delete(trace_id) }
-                @dirty_ids.delete(trace_id)
-                @deleted_ids << trace_id
-                @assoc_dirty = true
+                @mutex.synchronize do
+                  @traces.delete(trace_id)
+                  @associations.delete(trace_id)
+                  @associations.each_value { |links| links.delete(trace_id) }
+                  @dirty_ids.delete(trace_id)
+                  @deleted_ids << trace_id
+                  @assoc_dirty = true
+                end
               end
 
               def retrieve_by_type(type, min_strength: 0.0, limit: 100)
-                @traces.values
-                       .select { |t| t[:trace_type] == type && t[:strength] >= min_strength }
-                       .sort_by { |t| -t[:strength] }
-                       .first(limit)
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:trace_type] == type && t[:strength] >= min_strength }
+                        .sort_by { |t| -t[:strength] }
+                        .first(limit)
               end
 
               def retrieve_by_domain(domain_tag, min_strength: 0.0, limit: 100)
-                @traces.values
-                       .select { |t| t[:domain_tags].include?(domain_tag) && t[:strength] >= min_strength }
-                       .sort_by { |t| -t[:strength] }
-                       .first(limit)
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:domain_tags].include?(domain_tag) && t[:strength] >= min_strength }
+                        .sort_by { |t| -t[:strength] }
+                        .first(limit)
               end
 
               def retrieve_associated(trace_id, min_strength: 0.0, limit: 20)
@@ -88,12 +93,15 @@ module Legion
               end
 
               def all_traces(min_strength: 0.0)
-                @traces.values.select { |t| t[:strength] >= min_strength }
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:strength] >= min_strength }
               end
 
               def count
                 @traces.size
               end
+
+              def synchronize(&) = @mutex.synchronize(&)
 
               def firmware_traces
                 retrieve_by_type(:firmware)
@@ -130,13 +138,15 @@ module Legion
 
               # Write dirty traces to cache as individual keys
               def flush
-                flush_deleted
-                flush_traces
-                flush_associations
-                flush_index
-                Legion::Logging.debug "[memory] CacheStore flushed #{@dirty_ids.size} dirty traces (#{@traces.size} total)"
-                @dirty_ids.clear
-                @deleted_ids.clear
+                @mutex.synchronize do
+                  flush_deleted
+                  flush_traces
+                  flush_associations
+                  flush_index
+                  Legion::Logging.debug "[memory] CacheStore flushed #{@dirty_ids.size} dirty traces (#{@traces.size} total)"
+                  @dirty_ids.clear
+                  @deleted_ids.clear
+                end
               end
 
               # Pull latest state from cache
@@ -195,12 +205,16 @@ module Legion
 
                 Legion::Cache.set(ASSOC_KEY, strip_default_procs(@associations), TTL)
                 @assoc_dirty = false
+              rescue StandardError => e
+                Legion::Logging.warn "[memory] CacheStore flush_associations failed (#{@associations.size} entries): #{e.message}" if defined?(Legion::Logging)
               end
 
               def flush_index
                 return if @dirty_ids.empty? && @deleted_ids.empty?
 
                 Legion::Cache.set(INDEX_KEY, @traces.keys, TTL)
+              rescue StandardError => e
+                Legion::Logging.warn "[memory] CacheStore flush_index failed (#{@traces.size} traces): #{e.message}" if defined?(Legion::Logging)
               end
 
               def strip_default_procs(hash)

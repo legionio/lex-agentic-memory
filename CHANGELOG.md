@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.7] - 2026-03-24
+
+### Fixed
+- Add Mutex synchronization to CacheStore for thread-safety across concurrent store/iterate/flush operations
+- Add rescue blocks to `flush_associations` and `flush_index` for graceful handling of oversized cache entries
+
 ## [0.1.6] - 2026-03-23
 
 ### Fixed
