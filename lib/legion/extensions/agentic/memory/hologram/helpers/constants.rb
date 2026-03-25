@@ -25,7 +25,7 @@ module Legion
                 [(0.7...0.9),   :substantial],
                 [(0.5...0.7),   :partial],
                 [(0.3...0.5),   :degraded],
-                [(..0.3),       :fragmentary]
+                [..0.3,         :fragmentary]
               ].freeze
 
               # Resolution labels mapping hologram resolution to symbol
@@ -34,7 +34,7 @@ module Legion
                 [(0.7...0.9),   :high],
                 [(0.5...0.7),   :medium],
                 [(0.3...0.5),   :low],
-                [(..0.3),       :fragmentary]
+                [..0.3,         :fragmentary]
               ].freeze
 
               # Fidelity labels for individual fragments
@@ -43,7 +43,7 @@ module Legion
                 [(0.6...0.8),   :clear],
                 [(0.4...0.6),   :hazy],
                 [(0.2...0.4),   :clouded],
-                [(..0.2),       :corrupted]
+                [..0.2,         :corrupted]
               ].freeze
 
               # Interference strength labels
@@ -51,7 +51,7 @@ module Legion
                 [(0.7..),       :strong],
                 [(0.4...0.7),   :moderate],
                 [(0.1...0.4),   :weak],
-                [(..0.1),       :negligible]
+                [..0.1,         :negligible]
               ].freeze
 
               def self.label_for(table, value)
