@@ -82,14 +82,16 @@ module Legion
               def record_coactivation(trace_id_a, trace_id_b)
                 return if trace_id_a == trace_id_b
 
-                @associations[trace_id_a] ||= {}
-                @associations[trace_id_b] ||= {}
-                @associations[trace_id_a][trace_id_b] = (@associations[trace_id_a][trace_id_b] || 0) + 1
-                @associations[trace_id_b][trace_id_a] = (@associations[trace_id_b][trace_id_a] || 0) + 1
+                @mutex.synchronize do
+                  @associations[trace_id_a] ||= {}
+                  @associations[trace_id_b] ||= {}
+                  @associations[trace_id_a][trace_id_b] = (@associations[trace_id_a][trace_id_b] || 0) + 1
+                  @associations[trace_id_b][trace_id_a] = (@associations[trace_id_b][trace_id_a] || 0) + 1
 
-                threshold = Helpers::Trace::COACTIVATION_THRESHOLD
-                link_traces(trace_id_a, trace_id_b) if @associations[trace_id_a][trace_id_b] >= threshold
-                @assoc_dirty = true
+                  threshold = Helpers::Trace::COACTIVATION_THRESHOLD
+                  link_traces(trace_id_a, trace_id_b) if @associations[trace_id_a][trace_id_b] >= threshold
+                  @assoc_dirty = true
+                end
               end
 
               def all_traces(min_strength: 0.0)
@@ -108,7 +110,8 @@ module Legion
               end
 
               def walk_associations(start_id:, max_hops: 12, min_strength: 0.1)
-                return [] unless @traces.key?(start_id)
+                snapshot = @mutex.synchronize { @traces.dup }
+                return [] unless snapshot.key?(start_id)
 
                 results = []
                 visited = Set.new([start_id])
@@ -116,13 +119,13 @@ module Legion
 
                 until queue.empty?
                   current_id, depth, path = queue.shift
-                  current = @traces[current_id]
+                  current = snapshot[current_id]
                   next unless current
 
                   current[:associated_traces].each do |neighbor_id|
                     next if visited.include?(neighbor_id)
 
-                    neighbor = @traces[neighbor_id]
+                    neighbor = snapshot[neighbor_id]
                     next unless neighbor
                     next unless neighbor[:strength] >= min_strength
 

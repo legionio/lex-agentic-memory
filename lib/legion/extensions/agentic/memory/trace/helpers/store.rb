@@ -14,13 +14,14 @@ module Legion
               attr_reader :traces, :associations
 
               def initialize
+                @mutex = Mutex.new
                 @traces = {}
                 @associations = Hash.new { |h, k| h[k] = Hash.new(0) }
                 load_from_local
               end
 
               def store(trace)
-                @traces[trace[:trace_id]] = trace
+                @mutex.synchronize { @traces[trace[:trace_id]] = trace }
                 trace[:trace_id]
               end
 
@@ -29,23 +30,25 @@ module Legion
               end
 
               def delete(trace_id)
-                @traces.delete(trace_id)
-                @associations.delete(trace_id)
-                @associations.each_value { |links| links.delete(trace_id) }
+                @mutex.synchronize do
+                  @traces.delete(trace_id)
+                  @associations.delete(trace_id)
+                  @associations.each_value { |links| links.delete(trace_id) }
+                end
               end
 
               def retrieve_by_type(type, min_strength: 0.0, limit: 100)
-                @traces.values
-                       .select { |t| t[:trace_type] == type && t[:strength] >= min_strength }
-                       .sort_by { |t| -t[:strength] }
-                       .first(limit)
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:trace_type] == type && t[:strength] >= min_strength }
+                        .sort_by { |t| -t[:strength] }
+                        .first(limit)
               end
 
               def retrieve_by_domain(domain_tag, min_strength: 0.0, limit: 100)
-                @traces.values
-                       .select { |t| t[:domain_tags].include?(domain_tag) && t[:strength] >= min_strength }
-                       .sort_by { |t| -t[:strength] }
-                       .first(limit)
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:domain_tags].include?(domain_tag) && t[:strength] >= min_strength }
+                        .sort_by { |t| -t[:strength] }
+                        .first(limit)
               end
 
               def retrieve_associated(trace_id, min_strength: 0.0, limit: 20)
@@ -62,30 +65,33 @@ module Legion
               def record_coactivation(trace_id_a, trace_id_b)
                 return if trace_id_a == trace_id_b
 
-                @associations[trace_id_a][trace_id_b] += 1
-                @associations[trace_id_b][trace_id_a] += 1
+                @mutex.synchronize do
+                  @associations[trace_id_a][trace_id_b] += 1
+                  @associations[trace_id_b][trace_id_a] += 1
 
-                threshold = Helpers::Trace::COACTIVATION_THRESHOLD
-
-                return unless @associations[trace_id_a][trace_id_b] >= threshold
-
-                link_traces(trace_id_a, trace_id_b)
+                  threshold = Helpers::Trace::COACTIVATION_THRESHOLD
+                  link_traces(trace_id_a, trace_id_b) if @associations[trace_id_a][trace_id_b] >= threshold
+                end
               end
 
               def all_traces(min_strength: 0.0)
-                @traces.values.select { |t| t[:strength] >= min_strength }
+                snapshot = @mutex.synchronize { @traces.values }
+                snapshot.select { |t| t[:strength] >= min_strength }
               end
 
               def count
                 @traces.size
               end
 
+              def synchronize(&) = @mutex.synchronize(&)
+
               def firmware_traces
                 retrieve_by_type(:firmware)
               end
 
               def walk_associations(start_id:, max_hops: 12, min_strength: 0.1)
-                return [] unless @traces.key?(start_id)
+                snapshot = @mutex.synchronize { @traces.dup }
+                return [] unless snapshot.key?(start_id)
 
                 results  = []
                 visited  = Set.new([start_id])
@@ -93,12 +99,12 @@ module Legion
 
                 until queue.empty?
                   current_id, depth, path = queue.shift
-                  next unless (current = @traces[current_id])
+                  next unless (current = snapshot[current_id])
 
                   current[:associated_traces].each do |neighbor_id|
                     next if visited.include?(neighbor_id)
 
-                    neighbor = @traces[neighbor_id]
+                    neighbor = snapshot[neighbor_id]
                     next unless neighbor
                     next unless neighbor[:strength] >= min_strength
 
@@ -117,8 +123,9 @@ module Legion
                 return unless Legion::Data::Local.connection.table_exists?(:memory_traces)
 
                 db = Legion::Data::Local.connection
+                traces_snapshot = @mutex.synchronize { @traces.dup }
 
-                @traces.each_value do |trace|
+                traces_snapshot.each_value do |trace|
                   row = serialize_trace_for_db(trace)
                   existing = db[:memory_traces].where(trace_id: trace[:trace_id]).first
                   if existing
@@ -129,7 +136,7 @@ module Legion
                 end
 
                 db_trace_ids = db[:memory_traces].select_map(:trace_id)
-                memory_trace_ids = @traces.keys
+                memory_trace_ids = traces_snapshot.keys
                 stale_ids = db_trace_ids - memory_trace_ids
                 db[:memory_traces].where(trace_id: stale_ids).delete unless stale_ids.empty?
 

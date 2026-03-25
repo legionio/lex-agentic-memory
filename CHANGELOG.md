@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Add Mutex synchronization to trace Store and CacheStore for thread safety during concurrent tick cycles
+
 ## [0.1.7] - 2026-03-24
 
 ### Fixed
