@@ -5,6 +5,7 @@ require 'legion/extensions/agentic/memory/trace/helpers/trace'
 require 'legion/extensions/agentic/memory/trace/helpers/decay'
 require 'legion/extensions/agentic/memory/trace/helpers/store'
 require 'legion/extensions/agentic/memory/trace/helpers/cache_store'
+require 'legion/extensions/agentic/memory/trace/helpers/postgres_store'
 require 'legion/extensions/agentic/memory/trace/helpers/error_tracer'
 require 'legion/extensions/agentic/memory/trace/runners/traces'
 require 'legion/extensions/agentic/memory/trace/runners/consolidation'
@@ -31,13 +32,33 @@ module Legion
             private
 
             def create_store
-              if defined?(Legion::Cache) && Legion::Cache.respond_to?(:connected?) && Legion::Cache.connected?
+              if postgres_available?
+                Legion::Logging.debug '[memory] Using shared PostgresStore (write-through)'
+                Helpers::PostgresStore.new(tenant_id: resolve_tenant_id)
+              elsif defined?(Legion::Cache) && Legion::Cache.respond_to?(:connected?) && Legion::Cache.connected?
                 Legion::Logging.debug '[memory] Using shared CacheStore (memcached)'
                 Helpers::CacheStore.new
               else
                 Legion::Logging.debug '[memory] Using shared in-memory Store'
                 Helpers::Store.new
               end
+            end
+
+            def postgres_available?
+              defined?(Legion::Data) &&
+                Legion::Data.respond_to?(:connection) &&
+                Legion::Data.connection &&
+                %i[postgres mysql2].include?(Legion::Data.connection.adapter_scheme) &&
+                Legion::Data.connection.table_exists?(:memory_traces) &&
+                Legion::Data.connection.table_exists?(:memory_associations)
+            rescue StandardError
+              false
+            end
+
+            def resolve_tenant_id
+              Legion::Settings[:data]&.dig(:tenant_id)
+            rescue StandardError
+              nil
             end
           end
         end

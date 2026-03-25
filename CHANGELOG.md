@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.11] - 2026-03-25
+
+### Added
+- `Helpers::HotTier` module: Redis hot-tier cache in front of PostgresStore using `Legion::Cache::RedisHash`. Stores traces as Redis hashes with 24-hour TTL, maintains a sorted-set index per tenant, and provides `cache_trace`, `fetch_trace`, and `evict_trace` operations
+- `PostgresStore#retrieve` checks hot tier first; falls through to DB on miss and populates hot tier on DB hit
+- `PostgresStore#store` writes through to hot tier after successful DB write
+- `PostgresStore#delete` evicts from hot tier before DB delete
+- `PostgresStore#update` evicts stale hot-tier entry after DB update
+- 32 new specs covering HotTier interface, serialize/deserialize round-trip, availability guard, and all four PostgresStore integration points
+
+## [0.1.10] - 2026-03-25
+
+### Added
+- `Helpers::PostgresStore`: write-through durable store backed by Legion::Data (PostgreSQL or MySQL), scoped by tenant_id. Implements full store interface: store, retrieve, retrieve_by_type, retrieve_by_domain, all_traces, delete, update, record_coactivation, associations_for, walk_associations, delete_lowest_confidence, delete_least_recently_used, firmware_traces, flush (no-op), db_ready?
+- `create_store` in `Trace` module now selects PostgresStore when a PostgreSQL or MySQL connection is available with both required tables; falls back to CacheStore or in-memory Store
+- `postgres_available?` and `resolve_tenant_id` private helpers on `Trace` module
+- 46 new specs covering all PostgresStore methods using an in-memory SQLite DB
+
 ## [0.1.9] - 2026-03-25
 
 ### Added
