@@ -53,6 +53,12 @@ module Legion
                   count: results.size }
               end
 
+              def decay_all(rate: Helpers::Constants::PRESERVATION_DECAY, engine: nil, **)
+                eng = resolve_engine(engine)
+                eng.decay_all!(rate: rate)
+                { success: true, remaining: eng.all_artifacts.size }
+              end
+
               def archaeology_status(engine: nil, **)
                 eng = resolve_engine(engine)
                 { success: true, report: eng.archaeology_report }

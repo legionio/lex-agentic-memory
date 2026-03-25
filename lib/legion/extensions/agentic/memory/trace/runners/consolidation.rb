@@ -86,6 +86,13 @@ module Legion
                 { linked: true }
               end
 
+              def enforce_quota(store: nil, **)
+                store ||= default_store
+                quota = Quota.new
+                quota.enforce!(store)
+                { success: true, within_limits: quota.within_limits?(store) }
+              end
+
               def erase_by_type(type:, store: nil, **)
                 store ||= default_store
                 type = type.to_sym

@@ -65,6 +65,12 @@ module Legion
                 { success: true, echoes: echoes.map(&:to_h), count: echoes.size }
               end
 
+              def decay_all(engine: nil, **)
+                eng = engine || default_engine
+                eng.decay_all!
+                { success: true, **eng.echo_report }
+              end
+
               def chamber_status(engine: nil, **)
                 eng = engine || default_engine
                 { success: true, **eng.echo_report }

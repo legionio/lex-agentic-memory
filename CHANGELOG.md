@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.9] - 2026-03-25
+
+### Added
+- Periodic actors for 10 sub-modules: Archaeology (decay), Compression (maintenance), Echo (decay), EchoChamber (decay), ImmuneMemory (decay), Nostalgia (maintenance), Palimpsest (decay), Reserve (maintenance), SemanticPriming (decay), SemanticSatiation (recovery) (closes #1)
+- Quota enforcement actor for Trace (runs every 300s, calls enforce_quota) (closes #2)
+- Runner methods: `decay_all` for Archaeology and EchoChamber, `enforce_quota` for Trace::Consolidation
 
 ### Fixed
 - Add Mutex synchronization to trace Store and CacheStore for thread safety during concurrent tick cycles
