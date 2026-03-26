@@ -15,8 +15,9 @@ module Legion
               TRACES_TABLE = :memory_traces
               ASSOCIATIONS_TABLE = :memory_associations
 
-              def initialize(tenant_id: nil)
+              def initialize(tenant_id: nil, agent_id: nil)
                 @tenant_id = tenant_id
+                @agent_id  = agent_id || resolve_agent_id
               end
 
               # Store (upsert) a trace by trace_id.
@@ -262,6 +263,12 @@ module Legion
                 Legion::Data.connection
               end
 
+              def resolve_agent_id
+                Legion::Settings.dig(:agent, :id) || 'default'
+              rescue StandardError
+                'default'
+              end
+
               # Dataset for memory_traces scoped by tenant_id (if set).
               def traces_ds
                 ds = db[TRACES_TABLE]
@@ -277,6 +284,7 @@ module Legion
 
                 {
                   trace_id:                trace[:trace_id],
+                  agent_id:                @agent_id,
                   tenant_id:               @tenant_id,
                   trace_type:              trace[:trace_type].to_s,
                   content:                 payload.is_a?(Hash) ? Legion::JSON.dump(payload) : payload.to_s,

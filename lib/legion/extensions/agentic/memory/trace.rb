@@ -34,7 +34,7 @@ module Legion
             def create_store
               if postgres_available?
                 Legion::Logging.debug '[memory] Using shared PostgresStore (write-through)'
-                Helpers::PostgresStore.new(tenant_id: resolve_tenant_id)
+                Helpers::PostgresStore.new(tenant_id: resolve_tenant_id, agent_id: resolve_agent_id)
               elsif defined?(Legion::Cache) && Legion::Cache.respond_to?(:connected?) && Legion::Cache.connected?
                 Legion::Logging.debug '[memory] Using shared CacheStore (memcached)'
                 Helpers::CacheStore.new
@@ -59,6 +59,12 @@ module Legion
               Legion::Settings[:data]&.dig(:tenant_id)
             rescue StandardError
               nil
+            end
+
+            def resolve_agent_id
+              Legion::Settings.dig(:agent, :id) || 'default'
+            rescue StandardError
+              'default'
             end
           end
         end
