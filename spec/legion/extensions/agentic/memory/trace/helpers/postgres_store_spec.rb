@@ -110,6 +110,23 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
     end
   end
 
+  # --- store insert_conflict syntax ---
+
+  describe '#store insert_conflict syntax' do
+    it 'calls insert_conflict with target: :trace_id (not :replace symbol)' do
+      ds = double('dataset')
+      allow(db).to receive(:[]).with(:memory_traces).and_return(ds)
+      allow(ds).to receive(:where).and_return(ds)
+      allow(ds).to receive(:insert_conflict).and_return(ds)
+      allow(ds).to receive(:insert)
+
+      store.store(semantic_trace)
+
+      expect(ds).to have_received(:insert_conflict)
+        .with(hash_including(target: :trace_id))
+    end
+  end
+
   # --- store + retrieve ---
 
   describe '#store and #retrieve' do

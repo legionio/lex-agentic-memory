@@ -25,10 +25,11 @@ module Legion
                 return nil unless db_ready?
 
                 row = serialize_trace(trace)
-                begin
-                  db[TRACES_TABLE].insert_conflict(:replace).insert(row)
-                rescue Sequel::UniqueConstraintViolation
-                  db[TRACES_TABLE].where(trace_id: trace[:trace_id]).update(row.except(:trace_id))
+                ds  = db[TRACES_TABLE]
+                if db.adapter_scheme == :mysql2
+                  ds.insert_conflict(update: row.except(:trace_id)).insert(row)
+                else
+                  ds.insert_conflict(target: :trace_id, update: row.except(:trace_id)).insert(row)
                 end
                 HotTier.cache_trace(trace, tenant_id: @tenant_id) if HotTier.available?
                 trace[:trace_id]
