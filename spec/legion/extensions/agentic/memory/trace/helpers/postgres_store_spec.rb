@@ -185,6 +185,53 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
     end
   end
 
+  # --- null byte sanitization ---
+
+  describe 'null byte sanitization' do
+    it 'strips null bytes from string content and stores successfully' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: "hello\x00world")
+      result = store.store(trace)
+      expect(result).not_to be_nil
+
+      retrieved = store.retrieve(trace[:trace_id])
+      expect(retrieved[:content_payload]).to eq('helloworld')
+    end
+
+    it 'strips null bytes from hash content payloads' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: { text: "has\x00null" })
+      result = store.store(trace)
+      expect(result).not_to be_nil
+
+      row = db[:memory_traces].where(trace_id: trace[:trace_id]).first
+      expect(row[:content]).not_to include("\x00")
+    end
+
+    it 'strips null bytes from domain_tags' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: 'clean', domain_tags: ["tag\x00bad"])
+      store.store(trace)
+
+      row = db[:memory_traces].where(trace_id: trace[:trace_id]).first
+      expect(row[:domain_tags]).not_to include("\x00")
+    end
+
+    it 'stores cleanly when no null bytes are present' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: 'no nulls here')
+      result = store.store(trace)
+      expect(result).not_to be_nil
+
+      retrieved = store.retrieve(trace[:trace_id])
+      expect(retrieved[:content_payload]).to eq('no nulls here')
+    end
+
+    it 'strips null bytes during partial update' do
+      store.store(semantic_trace)
+      store.update(semantic_trace[:trace_id], content_payload: { text: "up\x00dated" })
+
+      row = db[:memory_traces].where(trace_id: semantic_trace[:trace_id]).first
+      expect(row[:content]).not_to include("\x00")
+    end
+  end
+
   # --- retrieve_by_type ---
 
   describe '#retrieve_by_type' do
