@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.14] - 2026-03-26
+
+### Fixed
+- `PostgresStore#serialize_trace` and `#map_update_fields` now strip null bytes (`\x00`) from all string fields before INSERT/UPDATE. PostgreSQL text columns reject null bytes, causing `string contains null byte` errors when content from external sources (e.g., Teams Graph API) contains embedded nulls
+
 ## [0.1.13] - 2026-03-26
 
 ### Fixed

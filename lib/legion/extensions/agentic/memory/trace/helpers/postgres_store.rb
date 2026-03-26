@@ -286,28 +286,28 @@ module Legion
                   trace_id:                trace[:trace_id],
                   agent_id:                @agent_id,
                   tenant_id:               @tenant_id,
-                  trace_type:              trace[:trace_type].to_s,
-                  content:                 payload.is_a?(Hash) ? Legion::JSON.dump(payload) : payload.to_s,
+                  trace_type:              sanitize_pg_string(trace[:trace_type].to_s),
+                  content:                 sanitize_pg_string(payload.is_a?(Hash) ? Legion::JSON.dump(payload) : payload.to_s),
                   significance:            conf,
                   confidence:              conf,
-                  associations:            assocs.is_a?(Array) ? Legion::JSON.dump(assocs) : '[]',
-                  domain_tags:             tags.is_a?(Array)   ? Legion::JSON.dump(tags)   : nil,
+                  associations:            sanitize_pg_string(assocs.is_a?(Array) ? Legion::JSON.dump(assocs) : '[]'),
+                  domain_tags:             sanitize_pg_string(tags.is_a?(Array) ? Legion::JSON.dump(tags) : nil),
                   strength:                trace[:strength],
                   peak_strength:           trace[:peak_strength],
                   base_decay_rate:         trace[:base_decay_rate],
                   emotional_valence:       ev.is_a?(Numeric) ? ev.to_f : 0.0,
                   emotional_intensity:     trace[:emotional_intensity],
-                  origin:                  trace[:origin].to_s,
-                  source_agent_id:         trace[:source_agent_id],
-                  storage_tier:            trace[:storage_tier].to_s,
+                  origin:                  sanitize_pg_string(trace[:origin].to_s),
+                  source_agent_id:         sanitize_pg_string(trace[:source_agent_id]),
+                  storage_tier:            sanitize_pg_string(trace[:storage_tier].to_s),
                   last_reinforced:         trace[:last_reinforced],
                   last_decayed:            trace[:last_decayed],
                   reinforcement_count:     trace[:reinforcement_count],
                   unresolved:              trace[:unresolved]              || false,
                   consolidation_candidate: trace[:consolidation_candidate] || false,
-                  parent_trace_id:         trace[:parent_trace_id],
-                  encryption_key_id:       trace[:encryption_key_id],
-                  partition_id:            trace[:partition_id],
+                  parent_trace_id:         sanitize_pg_string(trace[:parent_trace_id]),
+                  encryption_key_id:       sanitize_pg_string(trace[:encryption_key_id]),
+                  partition_id:            sanitize_pg_string(trace[:partition_id]),
                   created_at:              trace[:created_at] || Time.now.utc,
                   accessed_at:             Time.now.utc
                 }
@@ -359,13 +359,13 @@ module Legion
 
                   row[col] = case col
                              when :content
-                               v.is_a?(Hash) ? Legion::JSON.dump(v) : v.to_s
+                               sanitize_pg_string(v.is_a?(Hash) ? Legion::JSON.dump(v) : v.to_s)
                              when :associations
-                               v.is_a?(Array) ? Legion::JSON.dump(v) : '[]'
+                               sanitize_pg_string(v.is_a?(Array) ? Legion::JSON.dump(v) : '[]')
                              when :domain_tags
-                               v.is_a?(Array) ? Legion::JSON.dump(v) : nil
+                               sanitize_pg_string(v.is_a?(Array) ? Legion::JSON.dump(v) : nil)
                              when :trace_type, :origin, :storage_tier
-                               v.to_s
+                               sanitize_pg_string(v.to_s)
                              else
                                v
                              end
@@ -388,6 +388,12 @@ module Legion
                 result.is_a?(Array) ? result : []
               rescue StandardError
                 []
+              end
+
+              def sanitize_pg_string(value)
+                return value unless value.is_a?(String)
+
+                value.delete("\x00")
               end
 
               def log_warn(message)
