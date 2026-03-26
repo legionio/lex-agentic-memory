@@ -12,6 +12,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
     d.create_table(:memory_traces) do
       primary_key :id
       String  :trace_id, size: 36, null: false, unique: true
+      String  :agent_id, size: 64, null: false, default: 'test-agent'
       String  :tenant_id, size: 64
       String  :trace_type, null: false
       String  :content, text: true, null: false
@@ -124,6 +125,23 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
 
       expect(ds).to have_received(:insert_conflict)
         .with(hash_including(target: :trace_id))
+    end
+  end
+
+  # --- store agent_id population ---
+
+  describe '#store agent_id population' do
+    it 'writes agent_id to the database row' do
+      store.store(semantic_trace)
+      row = db[:memory_traces].where(trace_id: semantic_trace[:trace_id]).first
+      expect(row[:agent_id]).not_to be_nil
+    end
+
+    it 'uses the resolved agent_id from settings' do
+      custom_store = described_class.new(tenant_id: tenant_id, agent_id: 'my-agent')
+      custom_store.store(semantic_trace)
+      row = db[:memory_traces].where(trace_id: semantic_trace[:trace_id]).first
+      expect(row[:agent_id]).to eq('my-agent')
     end
   end
 

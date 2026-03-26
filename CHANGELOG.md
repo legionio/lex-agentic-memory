@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13] - 2026-03-26
+
+### Fixed
+- `PostgresStore#serialize_trace` omitted `agent_id` column, causing `PG::NotNullViolation` on every insert against PostgreSQL (migration 022 declares `agent_id null: false`). Constructor now accepts `agent_id:` with fallback to `Legion::Settings.dig(:agent, :id)` or `'default'`
+- `Trace.create_store` factory now resolves and passes `agent_id` to PostgresStore
+- Spec schema for PostgresStore now includes `agent_id` column matching production migration
+
 ## [0.1.12] - 2026-03-26
 
 ### Fixed
