@@ -99,7 +99,9 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Hologram::Helpers::Hologram 
 
   describe '#reconstruct' do
     context 'with sufficient fragments' do
-      let(:fragments) { hologram.fragment!(4) }
+      # Force completeness above RECONSTRUCTION_THRESHOLD (0.3) so the context
+      # is deterministic — fragment!(4) uses rand and can produce all-insufficient sets.
+      let(:fragments) { hologram.fragment!(4).each { |f| f.completeness = 1.0 } }
 
       it 'returns success: true' do
         expect(hologram.reconstruct(fragments)[:success]).to be true
