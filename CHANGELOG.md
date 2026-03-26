@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.12] - 2026-03-26
+
+### Fixed
+- `PostgresStore#store` used SQLite-specific `insert_conflict(:replace)` which fails on PostgreSQL with `TypeError: no implicit conversion of Symbol into Integer`. Replaced with proper `insert_conflict(target: :trace_id, update: ...)` syntax that generates correct `ON CONFLICT` SQL
+
 ## [0.1.11] - 2026-03-25
 
 ### Added
