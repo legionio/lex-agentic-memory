@@ -36,41 +36,24 @@ end
 
 # Snapshot lifecycle hooks
 if defined?(Legion::Events)
-  snapshot_enabled = begin
-    Legion::Settings.dig(:snapshot, :enabled)
-  rescue StandardError => _e
-    true
-  end
+  settings_loaded = defined?(Legion::Settings)
+  snapshot_enabled = settings_loaded ? Legion::Settings.dig(:snapshot, :enabled) : true
   if snapshot_enabled
     require 'legion/extensions/agentic/memory/trace/helpers/snapshot'
 
     Legion::Events.on('service.shutting_down') do
-      next unless begin
-        Legion::Settings.dig(:snapshot, :auto_save_on_shutdown)
-      rescue StandardError => _e
-        true
-      end
+      auto_save = settings_loaded ? Legion::Settings.dig(:snapshot, :auto_save_on_shutdown) : true
+      next unless auto_save
 
-      agent_id = begin
-        Legion::Settings.dig(:agent, :id)
-      rescue StandardError => _e
-        nil
-      end || 'default'
+      agent_id = (settings_loaded ? Legion::Settings.dig(:agent, :id) : nil) || 'default'
       Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.save_snapshot(agent_id: agent_id)
     end
 
     Legion::Events.once('gaia.started') do
-      next unless begin
-        Legion::Settings.dig(:snapshot, :auto_restore_on_boot)
-      rescue StandardError => _e
-        true
-      end
+      auto_restore = settings_loaded ? Legion::Settings.dig(:snapshot, :auto_restore_on_boot) : true
+      next unless auto_restore
 
-      agent_id = begin
-        Legion::Settings.dig(:agent, :id)
-      rescue StandardError => _e
-        nil
-      end || 'default'
+      agent_id = (settings_loaded ? Legion::Settings.dig(:agent, :id) : nil) || 'default'
       Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.restore_snapshot(agent_id: agent_id)
     end
   end
