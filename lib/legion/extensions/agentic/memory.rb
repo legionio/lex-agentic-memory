@@ -33,3 +33,45 @@ module Legion
     end
   end
 end
+
+# Snapshot lifecycle hooks
+if defined?(Legion::Events)
+  snapshot_enabled = begin
+    Legion::Settings.dig(:snapshot, :enabled)
+  rescue StandardError
+    true
+  end
+  if snapshot_enabled
+    require 'legion/extensions/agentic/memory/trace/helpers/snapshot'
+
+    Legion::Events.on('service.shutting_down') do
+      next unless begin
+        Legion::Settings.dig(:snapshot, :auto_save_on_shutdown)
+      rescue StandardError
+        true
+      end
+
+      agent_id = begin
+        Legion::Settings.dig(:agent, :id)
+      rescue StandardError
+        nil
+      end || 'default'
+      Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.save_snapshot(agent_id: agent_id)
+    end
+
+    Legion::Events.once('gaia.started') do
+      next unless begin
+        Legion::Settings.dig(:snapshot, :auto_restore_on_boot)
+      rescue StandardError
+        true
+      end
+
+      agent_id = begin
+        Legion::Settings.dig(:agent, :id)
+      rescue StandardError
+        nil
+      end || 'default'
+      Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.restore_snapshot(agent_id: agent_id)
+    end
+  end
+end
