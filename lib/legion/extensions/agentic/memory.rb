@@ -38,7 +38,8 @@ end
 if defined?(Legion::Events)
   snapshot_enabled = begin
     Legion::Settings.dig(:snapshot, :enabled)
-  rescue StandardError
+  rescue StandardError => e
+    Legion::Logging.error e.message
     true
   end
   if snapshot_enabled
@@ -47,13 +48,15 @@ if defined?(Legion::Events)
     Legion::Events.on('service.shutting_down') do
       next unless begin
         Legion::Settings.dig(:snapshot, :auto_save_on_shutdown)
-      rescue StandardError
+      rescue StandardError => e
+        Legion::Logging.error e.message
         true
       end
 
       agent_id = begin
         Legion::Settings.dig(:agent, :id)
-      rescue StandardError
+      rescue StandardError => e
+        Legion::Logging.error e.message
         nil
       end || 'default'
       Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.save_snapshot(agent_id: agent_id)
@@ -62,13 +65,15 @@ if defined?(Legion::Events)
     Legion::Events.once('gaia.started') do
       next unless begin
         Legion::Settings.dig(:snapshot, :auto_restore_on_boot)
-      rescue StandardError
+      rescue StandardError => e
+        Legion::Logging.error e.message
         true
       end
 
       agent_id = begin
         Legion::Settings.dig(:agent, :id)
-      rescue StandardError
+      rescue StandardError => e
+        Legion::Logging.error e.message
         nil
       end || 'default'
       Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.restore_snapshot(agent_id: agent_id)

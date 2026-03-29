@@ -99,25 +99,25 @@ module Legion
 
                   state[:personality_state] = begin
                     Legion::Extensions::Agentic::Self.personality_snapshot
-                  rescue NameError, NoMethodError
+                  rescue NameError
                     {}
                   end
 
                   state[:mood_state] = begin
                     Legion::Extensions::Agentic::Affect.mood_snapshot
-                  rescue NameError, NoMethodError
+                  rescue NameError
                     {}
                   end
 
                   state[:trust_scores] = begin
                     Legion::Mesh.trust_snapshot
-                  rescue NameError, NoMethodError
+                  rescue NameError
                     {}
                   end
 
                   state[:reflection_history] = begin
                     Legion::Extensions::Agentic::Self.reflection_snapshot
-                  rescue NameError, NoMethodError
+                  rescue NameError
                     []
                   end
 
@@ -125,46 +125,54 @@ module Legion
                 end
 
                 def distribute_state(state)
-                  if state[:memory_traces]
-                    store = Legion::Extensions::Agentic::Memory::Trace.shared_store
-                    if store.respond_to?(:restore_traces)
-                      store.restore_traces(state[:memory_traces])
-                    elsif store.respond_to?(:store)
-                      state[:memory_traces].each { |t| store.store(t) }
-                    end
-                  end
+                  restore_memory_traces(state[:memory_traces])
+                  restore_personality(state[:personality_state])
+                  restore_mood(state[:mood_state])
+                  restore_trust_scores(state[:trust_scores])
+                  restore_reflections(state[:reflection_history])
+                end
 
-                  if state[:personality_state] && !state[:personality_state].empty?
-                    begin
-                      Legion::Extensions::Agentic::Self.restore_personality(state[:personality_state])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
-                  end
+                def restore_memory_traces(traces)
+                  return unless traces
 
-                  if state[:mood_state] && !state[:mood_state].empty?
-                    begin
-                      Legion::Extensions::Agentic::Affect.restore_mood(state[:mood_state])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
+                  store = Legion::Extensions::Agentic::Memory::Trace.shared_store
+                  if store.respond_to?(:restore_traces)
+                    store.restore_traces(traces)
+                  elsif store.respond_to?(:store)
+                    traces.each { |t| store.store(t) }
                   end
+                end
 
-                  if state[:trust_scores] && !state[:trust_scores].empty?
-                    begin
-                      Legion::Mesh.restore_trust(state[:trust_scores])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
-                  end
+                def restore_personality(personality_state)
+                  return unless personality_state && !personality_state.empty?
 
-                  return unless state[:reflection_history] && !state[:reflection_history].empty?
+                  Legion::Extensions::Agentic::Self.restore_personality(personality_state)
+                rescue NameError
+                  nil
+                end
 
-                  begin
-                    Legion::Extensions::Agentic::Self.restore_reflections(state[:reflection_history])
-                  rescue NameError, NoMethodError
-                    nil
-                  end
+                def restore_mood(mood_state)
+                  return unless mood_state && !mood_state.empty?
+
+                  Legion::Extensions::Agentic::Affect.restore_mood(mood_state)
+                rescue NameError
+                  nil
+                end
+
+                def restore_trust_scores(trust_scores)
+                  return unless trust_scores && !trust_scores.empty?
+
+                  Legion::Mesh.restore_trust(trust_scores)
+                rescue NameError
+                  nil
+                end
+
+                def restore_reflections(reflection_history)
+                  return unless reflection_history && !reflection_history.empty?
+
+                  Legion::Extensions::Agentic::Self.restore_reflections(reflection_history)
+                rescue NameError
+                  nil
                 end
 
                 def sign_data(data, _agent_id)
