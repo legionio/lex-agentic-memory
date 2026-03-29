@@ -37,16 +37,12 @@ module Legion
                   signature = raw[-64..]
                   packed = raw[0..-65]
 
-                  unless verify_data(packed, signature, agent_id)
-                    Legion::Logging.warn "[snapshot] signature verification failed for #{agent_id}" if defined?(Legion::Logging)
-                    return { success: false, reason: :invalid_signature }
-                  end
+                  return { success: false, reason: :invalid_signature } unless verify_data(packed, signature, agent_id)
 
                   state = MessagePack.unpack(packed, symbolize_keys: true)
                   distribute_state(state)
                   { success: true, agent_id: agent_id, timestamp: state[:timestamp] }
                 rescue StandardError => e
-                  Legion::Logging.warn "[snapshot] restore failed: #{e.message}" if defined?(Legion::Logging)
                   { success: false, reason: :error, message: e.message }
                 end
 
@@ -99,25 +95,25 @@ module Legion
 
                   state[:personality_state] = begin
                     Legion::Extensions::Agentic::Self.personality_snapshot
-                  rescue NameError
+                  rescue NameError => _e
                     {}
                   end
 
                   state[:mood_state] = begin
                     Legion::Extensions::Agentic::Affect.mood_snapshot
-                  rescue NameError
+                  rescue NameError => _e
                     {}
                   end
 
                   state[:trust_scores] = begin
                     Legion::Mesh.trust_snapshot
-                  rescue NameError
+                  rescue NameError => _e
                     {}
                   end
 
                   state[:reflection_history] = begin
                     Legion::Extensions::Agentic::Self.reflection_snapshot
-                  rescue NameError
+                  rescue NameError => _e
                     []
                   end
 
@@ -147,7 +143,7 @@ module Legion
                   return unless personality_state && !personality_state.empty?
 
                   Legion::Extensions::Agentic::Self.restore_personality(personality_state)
-                rescue NameError
+                rescue NameError => _e
                   nil
                 end
 
@@ -155,7 +151,7 @@ module Legion
                   return unless mood_state && !mood_state.empty?
 
                   Legion::Extensions::Agentic::Affect.restore_mood(mood_state)
-                rescue NameError
+                rescue NameError => _e
                   nil
                 end
 
@@ -163,7 +159,7 @@ module Legion
                   return unless trust_scores && !trust_scores.empty?
 
                   Legion::Mesh.restore_trust(trust_scores)
-                rescue NameError
+                rescue NameError => _e
                   nil
                 end
 
@@ -171,7 +167,7 @@ module Legion
                   return unless reflection_history && !reflection_history.empty?
 
                   Legion::Extensions::Agentic::Self.restore_reflections(reflection_history)
-                rescue NameError
+                rescue NameError => _e
                   nil
                 end
 
