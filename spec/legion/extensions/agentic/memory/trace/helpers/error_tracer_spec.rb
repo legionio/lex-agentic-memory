@@ -3,11 +3,21 @@
 require 'spec_helper'
 
 RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::ErrorTracer do
+  # Capture originals before any example runs so we can restore after each
+  original_error = Legion::Logging.method(:error)
+  original_fatal = Legion::Logging.method(:fatal)
+
   before do
     # Reset state between examples
     described_class.instance_variable_set(:@active, nil)
     described_class.instance_variable_set(:@recent, nil)
     described_class.instance_variable_set(:@runner, nil)
+  end
+
+  after do
+    # Restore logging singleton methods to prevent cross-test side effects
+    Legion::Logging.define_singleton_method(:error, &original_error)
+    Legion::Logging.define_singleton_method(:fatal, &original_fatal)
   end
 
   describe '.setup' do
