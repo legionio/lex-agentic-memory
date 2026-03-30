@@ -21,7 +21,7 @@ module Legion
                   @runner = Object.new.extend(Legion::Extensions::Agentic::Memory::Trace::Runners::Traces)
                   wrap_logging_methods
                   @active = true
-                  log.info('[memory] ErrorTracer active — errors/fatals will become episodic traces')
+                  Legion::Logging.info('[memory] ErrorTracer active — errors/fatals will become episodic traces')
                 end
 
                 def active?
