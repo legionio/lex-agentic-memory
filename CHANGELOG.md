@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.18] - 2026-03-30
+
+### Fixed
+- fix `NameError: undefined local variable or method 'log'` in ErrorTracer.setup by replacing `log.info` with `Legion::Logging.info` — singleton module context has no `Legion::Logging::Helper` mixin
+
 ## [0.1.17] - 2026-03-30
 
 ### Changed
