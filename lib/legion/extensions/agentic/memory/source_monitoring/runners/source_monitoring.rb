@@ -7,12 +7,12 @@ module Legion
         module SourceMonitoring
           module Runners
             module SourceMonitoring
-              include Legion::Extensions::Helpers::Lex if Legion::Extensions.const_defined?(:Helpers) &&
-                                                          Legion::Extensions::Helpers.const_defined?(:Lex)
+              include Legion::Extensions::Helpers::Lex if Legion::Extensions.const_defined?(:Helpers, false) &&
+                                                          Legion::Extensions::Helpers.const_defined?(:Lex, false)
 
               def record_source(content_id:, source:, domain: :general, confidence: nil, context: {}, **)
                 conf = confidence || Helpers::Constants::DEFAULT_CONFIDENCE
-                Legion::Logging.debug "[source_monitoring] record: content=#{content_id} source=#{source}"
+                log.debug("[source_monitoring] record: content=#{content_id} source=#{source}")
                 rec = tracker.record_source(
                   content_id: content_id, source: source.to_sym,
                   domain: domain, confidence: conf, context: context
@@ -26,12 +26,12 @@ module Legion
 
               def attribute_source(content_id:, **)
                 records = tracker.attribute(content_id: content_id)
-                Legion::Logging.debug "[source_monitoring] attribute: content=#{content_id} found=#{records.size}"
+                log.debug("[source_monitoring] attribute: content=#{content_id} found=#{records.size}")
                 { success: true, records: records.map(&:to_h), count: records.size }
               end
 
               def verify_source(record_id:, **)
-                Legion::Logging.debug "[source_monitoring] verify: #{record_id}"
+                log.debug("[source_monitoring] verify: #{record_id}")
                 rec = tracker.verify_source(record_id: record_id.to_sym)
                 if rec
                   { success: true, record: rec.to_h }
@@ -41,7 +41,7 @@ module Legion
               end
 
               def correct_source(record_id:, new_source:, **)
-                Legion::Logging.debug "[source_monitoring] correct: #{record_id} -> #{new_source}"
+                log.debug("[source_monitoring] correct: #{record_id} -> #{new_source}")
                 rec = tracker.correct_source(record_id: record_id.to_sym, new_source: new_source.to_sym)
                 if rec
                   { success: true, record: rec.to_h }
@@ -52,7 +52,7 @@ module Legion
 
               def reality_check(content_id:, **)
                 result = tracker.reality_check(content_id: content_id)
-                Legion::Logging.debug "[source_monitoring] reality_check: #{content_id} => #{result[:status]}"
+                log.debug("[source_monitoring] reality_check: #{content_id} => #{result[:status]}")
                 { success: true, **result }
               end
 
@@ -71,13 +71,13 @@ module Legion
               end
 
               def update_source_monitoring(**)
-                Legion::Logging.debug '[source_monitoring] tick'
+                log.debug('[source_monitoring] tick')
                 tracker.decay_all
                 { success: true, records: tracker.records.size }
               end
 
               def source_monitoring_stats(**)
-                Legion::Logging.debug '[source_monitoring] stats'
+                log.debug('[source_monitoring] stats')
                 { success: true, stats: tracker.to_h }
               end
 

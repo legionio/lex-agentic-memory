@@ -5,7 +5,7 @@ module Legion
     module Agentic
       module Memory
         module SourceMonitoring
-          module Actors
+          module Actor
             class Decay < Legion::Extensions::Actors::Every
               def time
                 60

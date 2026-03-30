@@ -253,7 +253,7 @@ module Legion
                   Legion::Data.respond_to?(:connection) &&
                   Legion::Data.connection&.table_exists?(TRACES_TABLE) &&
                   Legion::Data.connection.table_exists?(ASSOCIATIONS_TABLE)
-              rescue StandardError
+              rescue StandardError => _e
                 false
               end
 
@@ -265,7 +265,7 @@ module Legion
 
               def resolve_agent_id
                 Legion::Settings.dig(:agent, :id) || 'default'
-              rescue StandardError
+              rescue StandardError => _e
                 'default'
               end
 
@@ -377,7 +377,7 @@ module Legion
 
                 parsed = Legion::JSON.load(raw)
                 parsed.is_a?(Hash) ? parsed : raw
-              rescue StandardError
+              rescue StandardError => _e
                 raw
               end
 
@@ -386,7 +386,7 @@ module Legion
 
                 result = Legion::JSON.load(raw)
                 result.is_a?(Array) ? result : []
-              rescue StandardError
+              rescue StandardError => _e
                 []
               end
 
@@ -397,7 +397,7 @@ module Legion
               end
 
               def log_warn(message)
-                Legion::Logging.warn "[memory:postgres_store] #{message}" if defined?(Legion::Logging)
+                Legion::Logging.warn "[memory:postgres_store] #{message}"
               end
             end
           end

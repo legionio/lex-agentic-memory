@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.17] - 2026-03-30
+
+### Changed
+- update to rubocop-legion 0.1.7, resolve all offenses
+
+## [0.1.16] - 2026-03-29
+
+### Fixed
+- Add `=> e` capture and `Legion::Logging.error` call to all bare `rescue StandardError` clauses in `memory.rb` to satisfy rescue-logging lint rule
+- Fix `Lint/ShadowedException` in `snapshot.rb`: replace `rescue NameError, NoMethodError` with `rescue NameError` (`NoMethodError` is a subclass of `NameError`)
+- Refactor `Snapshot#distribute_state` into dedicated helper methods to reduce cyclomatic/perceived complexity below threshold
+
 ## [0.1.15] - 2026-03-26
 
 ### Changed

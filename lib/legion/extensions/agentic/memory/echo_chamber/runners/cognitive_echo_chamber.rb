@@ -21,7 +21,7 @@ module Legion
                   source_agent: source_agent,
                   amplitude:    amplitude
                 )
-                Legion::Logging.debug "[cognitive_echo_chamber] echo created id=#{echo.id} type=#{echo_type} domain=#{domain}"
+                log.debug("[cognitive_echo_chamber] echo created id=#{echo.id} type=#{echo_type} domain=#{domain}")
                 { success: true, echo: echo.to_h }
               rescue ArgumentError => e
                 { success: false, error: e.message }
@@ -32,7 +32,7 @@ module Legion
 
                 eng     = engine || default_engine
                 chamber = eng.create_chamber(label: label, domain: domain, wall_thickness: wall_thickness)
-                Legion::Logging.debug "[cognitive_echo_chamber] chamber created id=#{chamber.id} label=#{label}"
+                log.debug("[cognitive_echo_chamber] chamber created id=#{chamber.id} label=#{label}")
                 { success: true, chamber: chamber.to_h }
               rescue ArgumentError => e
                 { success: false, error: e.message }
@@ -43,14 +43,14 @@ module Legion
                 echo = eng.amplify_echo(echo_id: echo_id, rate: rate)
                 return { success: false, error: 'echo not found' } unless echo
 
-                Legion::Logging.debug "[cognitive_echo_chamber] amplified echo=#{echo_id} amplitude=#{echo.amplitude}"
+                log.debug("[cognitive_echo_chamber] amplified echo=#{echo_id} amplitude=#{echo.amplitude}")
                 { success: true, echo: echo.to_h }
               end
 
               def disrupt(chamber_id:, force:, engine: nil, **)
                 eng    = engine || default_engine
                 result = eng.disrupt_chamber(chamber_id: chamber_id, force: force)
-                Legion::Logging.debug "[cognitive_echo_chamber] disrupt chamber=#{chamber_id} success=#{result[:success]}"
+                log.debug("[cognitive_echo_chamber] disrupt chamber=#{chamber_id} success=#{result[:success]}")
                 result
               end
 

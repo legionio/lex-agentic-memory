@@ -31,7 +31,7 @@ module Legion
                 candidates = find_candidates(domain, trigger)
                 return [] if candidates.empty?
 
-                new_events = candidates.map do |memory|
+                new_events = candidates.filter_map do |memory|
                   intensity = compute_intensity(memory, intensity_hint)
                   next unless intensity >= Constants::TRIGGER_SENSITIVITY
 
@@ -44,7 +44,7 @@ module Legion
                   memory.warm!(intensity * 0.1)
                   @events << event
                   event
-                end.compact
+                end
 
                 @events.shift while @events.size > Constants::MAX_EVENTS
                 new_events

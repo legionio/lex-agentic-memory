@@ -4,7 +4,7 @@ module Legion
   module Extensions
     module Agentic
       module Memory
-        VERSION = '0.1.15'
+        VERSION = '0.1.17'
       end
     end
   end

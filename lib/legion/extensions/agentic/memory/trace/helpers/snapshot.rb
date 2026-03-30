@@ -12,6 +12,8 @@ module Legion
           module Helpers
             module Snapshot
               class << self
+                include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
+
                 def save_snapshot(agent_id:)
                   state = gather_state(agent_id)
                   packed = MessagePack.pack(state)
@@ -37,16 +39,13 @@ module Legion
                   signature = raw[-64..]
                   packed = raw[0..-65]
 
-                  unless verify_data(packed, signature, agent_id)
-                    Legion::Logging.warn "[snapshot] signature verification failed for #{agent_id}" if defined?(Legion::Logging)
-                    return { success: false, reason: :invalid_signature }
-                  end
+                  return { success: false, reason: :invalid_signature } unless verify_data(packed, signature, agent_id)
 
                   state = MessagePack.unpack(packed, symbolize_keys: true)
                   distribute_state(state)
                   { success: true, agent_id: agent_id, timestamp: state[:timestamp] }
                 rescue StandardError => e
-                  Legion::Logging.warn "[snapshot] restore failed: #{e.message}" if defined?(Legion::Logging)
+                  log.error(e.message)
                   { success: false, reason: :error, message: e.message }
                 end
 
@@ -97,74 +96,88 @@ module Legion
                                             []
                                           end
 
-                  state[:personality_state] = begin
-                    Legion::Extensions::Agentic::Self.personality_snapshot
-                  rescue NameError, NoMethodError
-                    {}
-                  end
+                  state[:personality_state] =
+                    if defined?(Legion::Extensions::Agentic::Self) &&
+                       Legion::Extensions::Agentic::Self.respond_to?(:personality_snapshot)
+                      Legion::Extensions::Agentic::Self.personality_snapshot
+                    else
+                      {}
+                    end
 
-                  state[:mood_state] = begin
-                    Legion::Extensions::Agentic::Affect.mood_snapshot
-                  rescue NameError, NoMethodError
-                    {}
-                  end
+                  state[:mood_state] =
+                    if defined?(Legion::Extensions::Agentic::Affect) &&
+                       Legion::Extensions::Agentic::Affect.respond_to?(:mood_snapshot)
+                      Legion::Extensions::Agentic::Affect.mood_snapshot
+                    else
+                      {}
+                    end
 
-                  state[:trust_scores] = begin
-                    Legion::Mesh.trust_snapshot
-                  rescue NameError, NoMethodError
-                    {}
-                  end
+                  state[:trust_scores] =
+                    if defined?(Legion::Mesh) && Legion::Mesh.respond_to?(:trust_snapshot)
+                      Legion::Mesh.trust_snapshot
+                    else
+                      {}
+                    end
 
-                  state[:reflection_history] = begin
-                    Legion::Extensions::Agentic::Self.reflection_snapshot
-                  rescue NameError, NoMethodError
-                    []
-                  end
+                  state[:reflection_history] =
+                    if defined?(Legion::Extensions::Agentic::Self) &&
+                       Legion::Extensions::Agentic::Self.respond_to?(:reflection_snapshot)
+                      Legion::Extensions::Agentic::Self.reflection_snapshot
+                    else
+                      []
+                    end
 
                   state
                 end
 
                 def distribute_state(state)
-                  if state[:memory_traces]
-                    store = Legion::Extensions::Agentic::Memory::Trace.shared_store
-                    if store.respond_to?(:restore_traces)
-                      store.restore_traces(state[:memory_traces])
-                    elsif store.respond_to?(:store)
-                      state[:memory_traces].each { |t| store.store(t) }
-                    end
-                  end
+                  restore_memory_traces(state[:memory_traces])
+                  restore_personality(state[:personality_state])
+                  restore_mood(state[:mood_state])
+                  restore_trust_scores(state[:trust_scores])
+                  restore_reflections(state[:reflection_history])
+                end
 
-                  if state[:personality_state] && !state[:personality_state].empty?
-                    begin
-                      Legion::Extensions::Agentic::Self.restore_personality(state[:personality_state])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
-                  end
+                def restore_memory_traces(traces)
+                  return unless traces
 
-                  if state[:mood_state] && !state[:mood_state].empty?
-                    begin
-                      Legion::Extensions::Agentic::Affect.restore_mood(state[:mood_state])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
+                  store = Legion::Extensions::Agentic::Memory::Trace.shared_store
+                  if store.respond_to?(:restore_traces)
+                    store.restore_traces(traces)
+                  elsif store.respond_to?(:store)
+                    traces.each { |t| store.store(t) }
                   end
+                end
 
-                  if state[:trust_scores] && !state[:trust_scores].empty?
-                    begin
-                      Legion::Mesh.restore_trust(state[:trust_scores])
-                    rescue NameError, NoMethodError
-                      nil
-                    end
-                  end
+                def restore_personality(personality_state)
+                  return unless personality_state && !personality_state.empty?
+                  return unless defined?(Legion::Extensions::Agentic::Self) &&
+                                Legion::Extensions::Agentic::Self.respond_to?(:restore_personality)
 
-                  return unless state[:reflection_history] && !state[:reflection_history].empty?
+                  Legion::Extensions::Agentic::Self.restore_personality(personality_state)
+                end
 
-                  begin
-                    Legion::Extensions::Agentic::Self.restore_reflections(state[:reflection_history])
-                  rescue NameError, NoMethodError
-                    nil
-                  end
+                def restore_mood(mood_state)
+                  return unless mood_state && !mood_state.empty?
+                  return unless defined?(Legion::Extensions::Agentic::Affect) &&
+                                Legion::Extensions::Agentic::Affect.respond_to?(:restore_mood)
+
+                  Legion::Extensions::Agentic::Affect.restore_mood(mood_state)
+                end
+
+                def restore_trust_scores(trust_scores)
+                  return unless trust_scores && !trust_scores.empty?
+                  return unless defined?(Legion::Mesh) && Legion::Mesh.respond_to?(:restore_trust)
+
+                  Legion::Mesh.restore_trust(trust_scores)
+                end
+
+                def restore_reflections(reflection_history)
+                  return unless reflection_history && !reflection_history.empty?
+                  return unless defined?(Legion::Extensions::Agentic::Self) &&
+                                Legion::Extensions::Agentic::Self.respond_to?(:restore_reflections)
+
+                  Legion::Extensions::Agentic::Self.restore_reflections(reflection_history)
                 end
 
                 def sign_data(data, _agent_id)
