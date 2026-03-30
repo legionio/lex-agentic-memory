@@ -51,7 +51,7 @@ module Legion
               def available?
                 defined?(Legion::Cache::RedisHash) &&
                   Legion::Cache::RedisHash.redis_available?
-              rescue StandardError
+              rescue StandardError => _e
                 false
               end
 

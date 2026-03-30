@@ -45,7 +45,7 @@ module Legion
                   distribute_state(state)
                   { success: true, agent_id: agent_id, timestamp: state[:timestamp] }
                 rescue StandardError => e
-                  log.error(e.message) if respond_to?(:log)
+                  log.error(e.message)
                   { success: false, reason: :error, message: e.message }
                 end
 

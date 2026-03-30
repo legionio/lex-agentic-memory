@@ -18,8 +18,8 @@ module Legion
               Legion::Data.connection[TABLE].insert(
                 agent_id:     @agent_id,
                 trace_type:   trace_type.to_s,
-                content:      content.is_a?(String) ? content : Legion::JSON.dump(content),
-                associations: Legion::JSON.dump(associations),
+                content:      content.is_a?(String) ? content : json_dump(content),
+                associations: json_dump(associations),
                 confidence:   confidence,
                 created_at:   Time.now,
                 accessed_at:  Time.now
@@ -83,7 +83,7 @@ module Legion
 
             def db_ready?
               defined?(Legion::Data) && Legion::Data.connection&.table_exists?(TABLE)
-            rescue StandardError
+            rescue StandardError => _e
               false
             end
           end

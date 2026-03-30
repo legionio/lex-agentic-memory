@@ -5,7 +5,7 @@ module Legion
     module Agentic
       module Memory
         module SemanticSatiation
-          module Actors
+          module Actor
             class Recovery < Legion::Extensions::Actors::Every
               def runner_class = Runners::SemanticSatiation
               def runner_function = 'recover'

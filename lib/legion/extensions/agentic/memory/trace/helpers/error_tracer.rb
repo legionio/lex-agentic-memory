@@ -21,7 +21,7 @@ module Legion
                   @runner = Object.new.extend(Legion::Extensions::Agentic::Memory::Trace::Runners::Traces)
                   wrap_logging_methods
                   @active = true
-                  Legion::Logging.info '[memory] ErrorTracer active — errors/fatals will become episodic traces'
+                  log.info('[memory] ErrorTracer active — errors/fatals will become episodic traces')
                 end
 
                 def active?
@@ -80,7 +80,7 @@ module Legion
                   # Flush if cache-backed
                   store = @runner.send(:default_store)
                   store.flush if store.respond_to?(:flush)
-                rescue StandardError
+                rescue StandardError => _e
                   # Never let trace creation break the logging pipeline
                   nil
                 end

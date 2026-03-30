@@ -5,7 +5,7 @@ module Legion
     module Agentic
       module Memory
         module Reserve
-          module Actors
+          module Actor
             class Maintenance < Legion::Extensions::Actors::Every
               def runner_class = Runners::CognitiveReserve
               def runner_function = 'update_cognitive_reserve'

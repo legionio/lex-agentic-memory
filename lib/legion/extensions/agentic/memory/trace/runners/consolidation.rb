@@ -25,7 +25,7 @@ module Legion
 
                 store.store(trace)
 
-                Legion::Logging.debug "[memory] reinforced #{trace_id[0..7]} strength=#{new_strength.round(3)}#{' (imprint 3x)' if imprint_active}"
+                log.debug("[memory] reinforced #{trace_id[0..7]} strength=#{new_strength.round(3)}#{' (imprint 3x)' if imprint_active}")
                 { found: true, reinforced: true, trace_id: trace_id, new_strength: new_strength }
               end
 
@@ -55,7 +55,7 @@ module Legion
                   end
                 end
 
-                Legion::Logging.debug "[memory] decay cycle: decayed=#{decayed} pruned=#{pruned}"
+                log.debug("[memory] decay cycle: decayed=#{decayed} pruned=#{pruned}")
                 { decayed: decayed, pruned: pruned }
               end
 
@@ -73,7 +73,7 @@ module Legion
                   migrated += 1
                 end
 
-                Legion::Logging.debug "[memory] tier migration: migrated=#{migrated}"
+                log.debug("[memory] tier migration: migrated=#{migrated}")
                 { migrated: migrated }
               end
 
@@ -82,7 +82,7 @@ module Legion
 
                 store ||= default_store
                 store.record_coactivation(trace_id_a, trace_id_b)
-                Legion::Logging.debug "[memory] hebbian link #{trace_id_a[0..7]} <-> #{trace_id_b[0..7]}"
+                log.debug("[memory] hebbian link #{trace_id_a[0..7]} <-> #{trace_id_b[0..7]}")
                 { linked: true }
               end
 
@@ -99,7 +99,7 @@ module Legion
                 traces = store.retrieve_by_type(type, min_strength: 0.0, limit: 100_000)
                 count = traces.size
                 traces.each { |t| store.delete(t[:trace_id]) }
-                Legion::Logging.info "[memory] erased #{count} traces of type=#{type}"
+                log.info("[memory] erased #{count} traces of type=#{type}")
                 { erased: count, type: type }
               end
 
@@ -108,7 +108,7 @@ module Legion
                 traces = store.all_traces.select { |t| t[:partition_id] == partition_id }
                 count = traces.size
                 traces.each { |t| store.delete(t[:trace_id]) }
-                Legion::Logging.info "[memory] erased #{count} traces for partition=#{partition_id}"
+                log.info("[memory] erased #{count} traces for partition=#{partition_id}")
                 { erased: count, partition_id: partition_id }
               end
 
