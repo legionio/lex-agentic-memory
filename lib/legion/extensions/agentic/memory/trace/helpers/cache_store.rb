@@ -20,7 +20,7 @@ module Legion
               attr_reader :traces, :associations
 
               def initialize
-                Legion::Logging.info '[memory] CacheStore initialized (memcached-backed, per-key)'
+                log.info('[memory] CacheStore initialized (memcached-backed, per-key)')
                 @mutex        = Mutex.new
                 @traces       = {}
                 @associations = {}
@@ -28,7 +28,7 @@ module Legion
                 @deleted_ids  = Set.new
                 @assoc_dirty  = false
                 load_index
-                Legion::Logging.info "[memory] CacheStore loaded #{@traces.size} traces from cache"
+                log.info("[memory] CacheStore loaded #{@traces.size} traces from cache")
               end
 
               def store(trace)
@@ -146,7 +146,7 @@ module Legion
                   flush_traces
                   flush_associations
                   flush_index
-                  Legion::Logging.debug "[memory] CacheStore flushed #{@dirty_ids.size} dirty traces (#{@traces.size} total)"
+                  log.debug("[memory] CacheStore flushed #{@dirty_ids.size} dirty traces (#{@traces.size} total)")
                   @dirty_ids.clear
                   @deleted_ids.clear
                 end
@@ -160,7 +160,7 @@ module Legion
                 @deleted_ids.clear
                 @assoc_dirty = false
                 load_index
-                Legion::Logging.debug "[memory] CacheStore reloaded #{@traces.size} traces from cache"
+                log.debug("[memory] CacheStore reloaded #{@traces.size} traces from cache")
               end
 
               private
@@ -170,20 +170,20 @@ module Legion
               end
 
               def load_index
-                index = Legion::Cache.get(INDEX_KEY)
+                index = cache_get(INDEX_KEY)
                 return unless index.is_a?(Array)
 
                 loaded = 0
                 index.each do |id|
-                  trace = Legion::Cache.get(trace_key(id))
+                  trace = cache_get(trace_key(id))
                   if trace
                     @traces[id] = trace
                     loaded += 1
                   end
                 end
-                Legion::Logging.debug "[memory] CacheStore loaded #{loaded}/#{index.size} traces from index" if defined?(Legion::Logging)
+                log.debug("[memory] CacheStore loaded #{loaded}/#{index.size} traces from index")
               rescue StandardError => e
-                Legion::Logging.warn "[memory] CacheStore load_index failed: #{e.message}" if defined?(Legion::Logging)
+                log.warn("[memory] CacheStore load_index failed: #{e.message}")
               end
 
               def flush_traces
@@ -192,32 +192,32 @@ module Legion
                 @dirty_ids.each_slice(FLUSH_BATCH) do |batch|
                   batch.each do |id|
                     trace = @traces[id]
-                    Legion::Cache.set(trace_key(id), trace, TTL) if trace
+                    cache_set(trace_key(id), trace, TTL) if trace
                   end
                 end
               end
 
               def flush_deleted
                 @deleted_ids.each do |id|
-                  Legion::Cache.delete(trace_key(id))
+                  cache_delete(trace_key(id))
                 end
               end
 
               def flush_associations
                 return unless @assoc_dirty
 
-                Legion::Cache.set(ASSOC_KEY, strip_default_procs(@associations), TTL)
+                cache_set(ASSOC_KEY, strip_default_procs(@associations), TTL)
                 @assoc_dirty = false
               rescue StandardError => e
-                Legion::Logging.warn "[memory] CacheStore flush_associations failed (#{@associations.size} entries): #{e.message}" if defined?(Legion::Logging)
+                log.warn("[memory] CacheStore flush_associations failed (#{@associations.size} entries): #{e.message}")
               end
 
               def flush_index
                 return if @dirty_ids.empty? && @deleted_ids.empty?
 
-                Legion::Cache.set(INDEX_KEY, @traces.keys, TTL)
+                cache_set(INDEX_KEY, @traces.keys, TTL)
               rescue StandardError => e
-                Legion::Logging.warn "[memory] CacheStore flush_index failed (#{@traces.size} traces): #{e.message}" if defined?(Legion::Logging)
+                log.warn("[memory] CacheStore flush_index failed (#{@traces.size} traces): #{e.message}")
               end
 
               def strip_default_procs(hash)

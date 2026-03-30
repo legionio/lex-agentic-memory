@@ -51,19 +51,19 @@ module Legion
                 %i[postgres mysql2].include?(Legion::Data.connection.adapter_scheme) &&
                 Legion::Data.connection.table_exists?(:memory_traces) &&
                 Legion::Data.connection.table_exists?(:memory_associations)
-            rescue StandardError
+            rescue StandardError => _e
               false
             end
 
             def resolve_tenant_id
               Legion::Settings[:data]&.dig(:tenant_id)
-            rescue StandardError
+            rescue StandardError => _e
               nil
             end
 
             def resolve_agent_id
               Legion::Settings.dig(:agent, :id) || 'default'
-            rescue StandardError
+            rescue StandardError => _e
               'default'
             end
           end

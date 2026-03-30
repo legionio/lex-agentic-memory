@@ -12,7 +12,7 @@ $LOADED_FEATURES << 'legion/extensions/actors/every'
 
 require 'legion/extensions/agentic/memory/compression/actors/maintenance'
 
-RSpec.describe Legion::Extensions::Agentic::Memory::Compression::Actors::Maintenance do
+RSpec.describe Legion::Extensions::Agentic::Memory::Compression::Actor::Maintenance do
   subject(:actor) { described_class.new }
 
   it { expect(actor.runner_class).to eq(Legion::Extensions::Agentic::Memory::Compression::Runners::CognitiveCompression) }

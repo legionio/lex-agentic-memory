@@ -201,7 +201,7 @@ module Legion
                 content = begin
                   parsed = ::JSON.parse(content_raw, symbolize_names: true)
                   parsed.is_a?(Hash) ? parsed : content_raw
-                rescue StandardError
+                rescue StandardError => _e
                   content_raw
                 end
                 {
@@ -214,13 +214,13 @@ module Legion
                   base_decay_rate:         row[:base_decay_rate],
                   emotional_valence:       begin
                     ::JSON.parse(row[:emotional_valence], symbolize_names: true)
-                  rescue StandardError
+                  rescue StandardError => _e
                     0.0
                   end,
                   emotional_intensity:     row[:emotional_intensity],
                   domain_tags:             begin
                     ::JSON.parse(row[:domain_tags])
-                  rescue StandardError
+                  rescue StandardError => _e
                     []
                   end,
                   origin:                  row[:origin]&.to_sym,
@@ -233,13 +233,13 @@ module Legion
                   partition_id:            row[:partition_id],
                   associated_traces:       begin
                     ::JSON.parse(row[:associated_traces])
-                  rescue StandardError
+                  rescue StandardError => _e
                     []
                   end,
                   parent_trace_id:         row[:parent_id],
                   child_trace_ids:         begin
                     ::JSON.parse(row[:child_ids])
-                  rescue StandardError
+                  rescue StandardError => _e
                     []
                   end,
                   unresolved:              row[:unresolved] || false,

@@ -5,7 +5,7 @@ module Legion
     module Agentic
       module Memory
         module EchoChamber
-          module Actors
+          module Actor
             class Decay < Legion::Extensions::Actors::Every
               def runner_class = Runners::CognitiveEchoChamber
               def runner_function = 'decay_all'

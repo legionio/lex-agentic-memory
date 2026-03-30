@@ -32,7 +32,7 @@ module Legion
 
               def db_ready?
                 defined?(Legion::Data) && Legion::Data.connection&.table_exists?(PersistentStore::TABLE)
-              rescue StandardError
+              rescue StandardError => _e
                 false
               end
             end

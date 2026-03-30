@@ -5,7 +5,7 @@ module Legion
     module Agentic
       module Memory
         module Nostalgia
-          module Actors
+          module Actor
             class Maintenance < Legion::Extensions::Actors::Every
               def runner_class = Runners::Recall
               def runner_function = 'age_memories'

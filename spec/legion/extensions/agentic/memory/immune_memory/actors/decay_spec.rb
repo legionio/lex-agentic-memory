@@ -12,7 +12,7 @@ $LOADED_FEATURES << 'legion/extensions/actors/every'
 
 require 'legion/extensions/agentic/memory/immune_memory/actors/decay'
 
-RSpec.describe Legion::Extensions::Agentic::Memory::ImmuneMemory::Actors::Decay do
+RSpec.describe Legion::Extensions::Agentic::Memory::ImmuneMemory::Actor::Decay do
   subject(:actor) { described_class.new }
 
   it { expect(actor.runner_class).to eq(Legion::Extensions::Agentic::Memory::ImmuneMemory::Runners::CognitiveImmuneMemory) }

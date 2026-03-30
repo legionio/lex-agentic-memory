@@ -12,7 +12,7 @@ $LOADED_FEATURES << 'legion/extensions/actors/every'
 
 require 'legion/extensions/agentic/memory/semantic_satiation/actors/recovery'
 
-RSpec.describe Legion::Extensions::Agentic::Memory::SemanticSatiation::Actors::Recovery do
+RSpec.describe Legion::Extensions::Agentic::Memory::SemanticSatiation::Actor::Recovery do
   subject(:actor) { described_class.new }
 
   it { expect(actor.runner_class).to eq(Legion::Extensions::Agentic::Memory::SemanticSatiation::Runners::SemanticSatiation) }
