@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19] - 2026-03-31
+
+### Fixed
+- `postgres_store.retrieve_by_domain` now accepts `min_strength:` keyword to match in-memory store interface
+- `postgres_store.all_traces` now accepts `min_strength:` keyword to match in-memory store interface
+- Both methods now filter by strength in the SQL query for consistency with Store and CacheStore
+
 ## [0.1.18] - 2026-03-30
 
 ### Fixed
