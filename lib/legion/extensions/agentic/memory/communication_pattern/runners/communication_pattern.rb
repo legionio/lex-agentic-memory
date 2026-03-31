@@ -26,18 +26,18 @@ module Legion
                 analyzer = analyzer_for(agent_id)
                 { time_of_day_distribution: analyzer.time_of_day_distribution,
                   day_of_week_distribution: analyzer.day_of_week_distribution,
-                  channel_preference: analyzer.channel_preference,
+                  channel_preference:       analyzer.channel_preference,
                   direct_address_frequency: analyzer.direct_address_frequency,
-                  topic_clustering: analyzer.topic_clustering,
-                  consistency: analyzer.consistency,
-                  trace_count: analyzer.trace_count }
+                  topic_clustering:         analyzer.topic_clustering,
+                  consistency:              analyzer.consistency,
+                  trace_count:              analyzer.trace_count }
               end
 
               def pattern_stats(agent_id:, **)
                 analyzer = analyzer_for(agent_id)
-                { trace_count: analyzer.trace_count,
+                { trace_count:        analyzer.trace_count,
                   channel_preference: analyzer.channel_preference,
-                  consistency: analyzer.consistency }
+                  consistency:        analyzer.consistency }
               end
 
               private

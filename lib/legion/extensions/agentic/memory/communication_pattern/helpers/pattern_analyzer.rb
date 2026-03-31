@@ -104,7 +104,8 @@ module Legion
                 (trace[:domain_tags] || []).each { |tag| @topic_counts[tag.to_s] += 1 }
 
                 @trace_count += 1
-              rescue StandardError
+              rescue StandardError => e
+                Legion::Logging.warn("[pattern_analyzer] process_trace error: #{e.message}")
                 nil
               end
 
@@ -128,22 +129,23 @@ module Legion
               end
 
               def restore_state(parsed)
-                @trace_count    = parsed[:trace_count]&.to_i || 0
+                @trace_count    = parsed[:trace_count].to_i
                 @tod_histogram  = parsed[:tod_histogram] || Array.new(24, 0)
                 @dow_histogram  = parsed[:dow_histogram] || Array.new(7, 0)
                 @channel_counts = Hash.new(0).merge(parsed[:channel_counts] || {})
-                @direct_count   = parsed[:direct_count]&.to_i || 0
+                @direct_count   = parsed[:direct_count].to_i
                 @topic_counts   = Hash.new(0).merge(parsed[:topic_counts] || {})
               end
 
               def serialize(hash)
-                defined?(Legion::JSON) ? Legion::JSON.dump(hash) : JSON.dump(hash)
+                defined?(Legion::JSON) ? Legion::JSON.dump(hash) : ::JSON.dump(hash)
               end
 
               def deserialize(content)
-                parsed = defined?(Legion::JSON) ? Legion::JSON.parse(content) : JSON.parse(content, symbolize_names: true)
+                parsed = defined?(Legion::JSON) ? Legion::JSON.parse(content) : ::JSON.parse(content, symbolize_names: true)
                 parsed.is_a?(Hash) ? parsed.transform_keys(&:to_sym) : nil
-              rescue StandardError
+              rescue StandardError => e
+                Legion::Logging.warn("[pattern_analyzer] deserialize error: #{e.message}")
                 nil
               end
             end

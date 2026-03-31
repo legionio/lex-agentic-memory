@@ -43,9 +43,9 @@ RSpec.describe Legion::Extensions::Agentic::Memory::CommunicationPattern::Runner
   describe '#analyze_patterns' do
     it 'returns current patterns for an agent' do
       host.update_patterns(agent_id: 'p1', traces: [
-        { trace_id: 't1', trace_type: :episodic, created_at: Time.now.utc,
-          content_payload: { channel: 'teams' }, domain_tags: [], source_agent_id: 'p1' }
-      ])
+                             { trace_id: 't1', trace_type: :episodic, created_at: Time.now.utc,
+                               content_payload: { channel: 'teams' }, domain_tags: [], source_agent_id: 'p1' }
+                           ])
       result = host.analyze_patterns(agent_id: 'p1')
       expect(result).to have_key(:time_of_day_distribution)
       expect(result).to have_key(:channel_preference)

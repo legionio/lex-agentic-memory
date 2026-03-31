@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.20] - 2026-03-31
+
+### Added
+- CommunicationPattern sub-module for Phase C relational intelligence
+- PatternAnalyzer: time-of-day/day-of-week histograms, channel preference, topic clustering, consistency scoring
+- CommunicationPattern runner: update_patterns, analyze_patterns, pattern_stats
+- Apollo Local persistence for communication pattern state
+
 ## [0.1.19] - 2026-03-31
 
 ### Fixed
