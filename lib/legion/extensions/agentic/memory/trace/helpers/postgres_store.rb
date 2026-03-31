@@ -76,11 +76,12 @@ module Legion
               end
 
               # Retrieve traces whose domain_tags column contains the given tag string.
-              def retrieve_by_domain(tag, limit: 50)
+              def retrieve_by_domain(tag, min_strength: 0.0, limit: 50)
                 return [] unless db_ready?
 
                 rows = traces_ds
                        .where(Sequel.like(:domain_tags, "%#{tag}%"))
+                       .where { strength >= min_strength }
                        .order(Sequel.desc(:strength))
                        .limit(limit)
                        .all
@@ -91,10 +92,12 @@ module Legion
               end
 
               # Return all traces for this tenant.
-              def all_traces
+              def all_traces(min_strength: 0.0)
                 return [] unless db_ready?
 
-                traces_ds.all.map { |r| deserialize_trace(r) }
+                ds = traces_ds
+                ds = ds.where { strength >= min_strength } if min_strength > 0.0
+                ds.all.map { |r| deserialize_trace(r) }
               rescue StandardError => e
                 log_warn("all_traces failed: #{e.message}")
                 []
