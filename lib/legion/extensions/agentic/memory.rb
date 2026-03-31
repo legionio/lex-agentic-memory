@@ -19,6 +19,7 @@ require_relative 'memory/semantic_priming'
 require_relative 'memory/semantic_satiation'
 require_relative 'memory/source_monitoring'
 require_relative 'memory/transfer'
+require_relative 'memory/communication_pattern'
 
 module Legion
   module Extensions

@@ -4,7 +4,9 @@ module Legion
   module Extensions
     module Agentic
       module Memory
-        VERSION = '0.1.20'
+        module CommunicationPattern
+          VERSION = '0.1.0'
+        end
       end
     end
   end
