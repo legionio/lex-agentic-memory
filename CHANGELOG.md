@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.21] - 2026-04-01
+
+### Changed
+- `ErrorTracer.record_trace` now dispatches Postgres writes in a background `Thread.new` — error/fatal logging hooks no longer block the calling Puma thread
+- Debounce check remains synchronous; only the DB write and flush go async
+
 ## [0.1.20] - 2026-03-31
 
 ### Added
