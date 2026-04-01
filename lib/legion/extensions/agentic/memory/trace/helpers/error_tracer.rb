@@ -17,8 +17,12 @@ module Legion
                 def setup
                   return if @active
 
-                  @recent = {}
-                  @runner = Object.new.extend(Legion::Extensions::Agentic::Memory::Trace::Runners::Traces)
+                  @recent       = {}
+                  @recent_mutex = ::Mutex.new
+                  @runner       = Object.new.extend(Legion::Extensions::Agentic::Memory::Trace::Runners::Traces)
+                  @write_queue  = ::Queue.new
+                  @worker       = ::Thread.new { drain_queue }
+                  @worker.name  = 'legion-error-tracer'
                   wrap_logging_methods
                   @active = true
                   Legion::Logging.info '[memory] ErrorTracer active — errors/fatals will become episodic traces'
@@ -29,6 +33,19 @@ module Legion
                 end
 
                 private
+
+                def drain_queue
+                  loop do
+                    payload = @write_queue.pop
+                    break if payload == :stop
+
+                    @runner.store_trace(**payload)
+                    store = @runner.send(:default_store)
+                    store.flush if store.respond_to?(:flush)
+                  rescue StandardError
+                    nil
+                  end
+                end
 
                 def wrap_logging_methods
                   original_error = Legion::Logging.method(:error)
@@ -50,23 +67,21 @@ module Legion
                 def record_trace(message, level)
                   return unless message.is_a?(String) && !message.empty?
 
-                  # Debounce: skip if same message within window
                   now = Time.now.utc
                   key = "#{level}:#{message[0..100]}"
-                  return if @recent[key] && (now - @recent[key]) < DEBOUNCE_WINDOW
 
-                  @recent[key] = now
+                  @recent_mutex.synchronize do
+                    return if @recent[key] && (now - @recent[key]) < DEBOUNCE_WINDOW
 
-                  # Clean old entries periodically
-                  @recent.delete_if { |_, t| (now - t) > DEBOUNCE_WINDOW } if @recent.size > 500
+                    @recent[key] = now
+                    @recent.delete_if { |_, t| (now - t) > DEBOUNCE_WINDOW } if @recent.size > 500
+                  end
 
-                  # Extract component from [bracket] prefix
                   component = message.match(/\A\[([^\]]+)\]/)&.captures&.first || 'unknown'
-
                   valence   = level == :fatal ? FATAL_VALENCE : ERROR_VALENCE
                   intensity = level == :fatal ? FATAL_INTENSITY : ERROR_INTENSITY
 
-                  @runner.store_trace(
+                  @write_queue.push(
                     type:                :episodic,
                     content_payload:     message,
                     domain_tags:         ['error', component.downcase],
@@ -76,12 +91,7 @@ module Legion
                     unresolved:          true,
                     confidence:          0.9
                   )
-
-                  # Flush if cache-backed
-                  store = @runner.send(:default_store)
-                  store.flush if store.respond_to?(:flush)
-                rescue StandardError => _e
-                  # Never let trace creation break the logging pipeline
+                rescue StandardError
                   nil
                 end
               end

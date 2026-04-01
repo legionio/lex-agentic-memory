@@ -24,3 +24,13 @@ Legion/HelperMigration/DirectData:
 
 Legion/HelperMigration/OldLoggingMethods:
   Enabled: false
+
+# ErrorTracer intentionally spawns a single long-lived worker thread for async DB writes
+ThreadSafety/NewThread:
+  Exclude:
+    - 'lib/**/error_tracer.rb'
+
+# ErrorTracer rescue blocks are intentionally silent to never break the logging pipeline
+Legion/RescueLogging/NoCapture:
+  Exclude:
+    - 'lib/**/error_tracer.rb'
