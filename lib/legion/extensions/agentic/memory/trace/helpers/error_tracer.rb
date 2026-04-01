@@ -50,38 +50,35 @@ module Legion
                 def record_trace(message, level)
                   return unless message.is_a?(String) && !message.empty?
 
-                  # Debounce: skip if same message within window
                   now = Time.now.utc
                   key = "#{level}:#{message[0..100]}"
                   return if @recent[key] && (now - @recent[key]) < DEBOUNCE_WINDOW
 
                   @recent[key] = now
-
-                  # Clean old entries periodically
                   @recent.delete_if { |_, t| (now - t) > DEBOUNCE_WINDOW } if @recent.size > 500
 
-                  # Extract component from [bracket] prefix
                   component = message.match(/\A\[([^\]]+)\]/)&.captures&.first || 'unknown'
-
                   valence   = level == :fatal ? FATAL_VALENCE : ERROR_VALENCE
                   intensity = level == :fatal ? FATAL_INTENSITY : ERROR_INTENSITY
 
-                  @runner.store_trace(
-                    type:                :episodic,
-                    content_payload:     message,
-                    domain_tags:         ['error', component.downcase],
-                    origin:              :direct_experience,
-                    emotional_valence:   valence,
-                    emotional_intensity: intensity,
-                    unresolved:          true,
-                    confidence:          0.9
-                  )
+                  Thread.new do
+                    @runner.store_trace(
+                      type:                :episodic,
+                      content_payload:     message,
+                      domain_tags:         ['error', component.downcase],
+                      origin:              :direct_experience,
+                      emotional_valence:   valence,
+                      emotional_intensity: intensity,
+                      unresolved:          true,
+                      confidence:          0.9
+                    )
 
-                  # Flush if cache-backed
-                  store = @runner.send(:default_store)
-                  store.flush if store.respond_to?(:flush)
-                rescue StandardError => _e
-                  # Never let trace creation break the logging pipeline
+                    store = @runner.send(:default_store)
+                    store.flush if store.respond_to?(:flush)
+                  rescue StandardError
+                    nil
+                  end
+                rescue StandardError
                   nil
                 end
               end

@@ -24,3 +24,11 @@ Legion/HelperMigration/DirectData:
 
 Legion/HelperMigration/OldLoggingMethods:
   Enabled: false
+
+# ErrorTracer intentionally spawns a fire-and-forget thread for async DB writes
+ThreadSafety/NewThread:
+  Enabled: false
+
+# ErrorTracer rescue blocks are intentionally silent to never break the logging pipeline
+Legion/RescueLogging/NoCapture:
+  Enabled: false
