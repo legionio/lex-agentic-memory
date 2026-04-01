@@ -25,7 +25,7 @@ Legion/HelperMigration/DirectData:
 Legion/HelperMigration/OldLoggingMethods:
   Enabled: false
 
-# ErrorTracer intentionally spawns a fire-and-forget thread for async DB writes
+# ErrorTracer intentionally spawns a single long-lived worker thread for async DB writes
 ThreadSafety/NewThread:
   Exclude:
     - 'lib/**/error_tracer.rb'
