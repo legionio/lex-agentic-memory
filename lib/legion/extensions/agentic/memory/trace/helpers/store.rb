@@ -253,10 +253,13 @@ module Legion
 
               def serialize_trace_for_db(trace)
                 payload = trace[:content_payload] || trace[:content]
+                content = payload.is_a?(Hash) ? ::JSON.generate(payload) : payload.to_s
+                content = content.dup.force_encoding('BINARY').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
+                                 .delete("\0")
                 {
                   trace_id:                trace[:trace_id],
                   trace_type:              trace[:trace_type].to_s,
-                  content:                 payload.is_a?(Hash) ? ::JSON.generate(payload) : payload.to_s,
+                  content:                 content,
                   strength:                trace[:strength],
                   peak_strength:           trace[:peak_strength],
                   base_decay_rate:         trace[:base_decay_rate],

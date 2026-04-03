@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.23] - 2026-04-03
+
+### Fixed
+- Sanitize trace content before SQLite persist: force-decode to BINARY then re-encode UTF-8, strip null bytes — prevents `unrecognized token` SQL errors from unescaped characters
+
 ## [0.1.22] - 2026-04-03
 
 ### Changed
