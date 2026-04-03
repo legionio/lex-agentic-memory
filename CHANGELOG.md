@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.24] - 2026-04-03
+
+### Fixed
+- Wrap `save_to_local` persist in a single SQLite transaction — 32K individual lock acquisitions become 1
+- Use `insert_conflict(:replace)` instead of SELECT-then-INSERT/UPDATE per trace
+
 ## [0.1.23] - 2026-04-03
 
 ### Fixed

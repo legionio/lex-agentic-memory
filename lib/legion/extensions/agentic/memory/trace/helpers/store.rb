@@ -165,10 +165,12 @@ module Legion
                 return unless snapshots
 
                 traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty = snapshots
-                scoped_trace_ids = db[:memory_traces].where(partition_id: @partition_id).select_map(:trace_id)
-                memory_trace_ids = traces_snapshot.keys
-                stale_ids = persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
-                persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, associations_dirty)
+                db.transaction do
+                  scoped_trace_ids = db[:memory_traces].where(partition_id: @partition_id).select_map(:trace_id)
+                  memory_trace_ids = traces_snapshot.keys
+                  stale_ids = persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
+                  persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, associations_dirty)
+                end
                 clear_dirty_flags(trace_rows_snapshot)
               end
 
@@ -187,12 +189,9 @@ module Legion
               def persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
                 return [] unless traces_dirty
 
-                trace_rows_snapshot.each do |trace_id, row|
-                  if db[:memory_traces].where(trace_id: trace_id).first
-                    db[:memory_traces].where(trace_id: trace_id).update(row)
-                  else
-                    db[:memory_traces].insert(row)
-                  end
+                ds = db[:memory_traces]
+                trace_rows_snapshot.each_value do |row|
+                  ds.insert_conflict(:replace).insert(row)
                 end
                 stale_ids = scoped_trace_ids - memory_trace_ids
                 db[:memory_traces].where(trace_id: stale_ids).delete unless stale_ids.empty?
