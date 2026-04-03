@@ -179,6 +179,12 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
       expect(other_store.retrieve(semantic_trace[:trace_id])).to be_nil
     end
 
+    it 'scopes retrieve to the correct agent within the same tenant' do
+      store.store(semantic_trace)
+      other_store = described_class.new(tenant_id: tenant_id, agent_id: 'other-agent')
+      expect(other_store.retrieve(semantic_trace[:trace_id])).to be_nil
+    end
+
     it 'returns nil when db not ready' do
       db.drop_table(:memory_traces)
       expect(store.retrieve(semantic_trace[:trace_id])).to be_nil
@@ -299,6 +305,13 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
       other = described_class.new(tenant_id: 'other')
       other.store(episodic_trace)
       expect(store.all_traces.size).to eq(1)
+    end
+
+    it 'does not include traces from another agent in the same tenant' do
+      store.store(semantic_trace)
+      other = described_class.new(tenant_id: tenant_id, agent_id: 'other-agent')
+      other.store(episodic_trace)
+      expect(store.all_traces.map { |trace| trace[:trace_id] }).to eq([semantic_trace[:trace_id]])
     end
 
     it 'returns empty array when db not ready' do

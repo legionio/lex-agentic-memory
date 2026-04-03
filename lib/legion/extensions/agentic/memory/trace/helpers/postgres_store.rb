@@ -10,7 +10,7 @@ module Legion
           module Helpers
             # Write-through durable store backed by Legion::Data (PostgreSQL or MySQL).
             # All writes go directly to the database — no in-memory dirty tracking, no flush.
-            # Scoped by tenant_id so multiple agents can share the same DB tables safely.
+            # Scoped by tenant_id and agent_id so multiple agents can share the same DB tables safely.
             class PostgresStore
               TRACES_TABLE = :memory_traces
               ASSOCIATIONS_TABLE = :memory_associations
@@ -32,19 +32,19 @@ module Legion
                 else
                   ds.insert_conflict(target: :trace_id, update: row.except(:trace_id)).insert(row)
                 end
-                HotTier.cache_trace(trace, tenant_id: @tenant_id) if HotTier.available?
+                HotTier.cache_trace(trace, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available?
                 trace[:trace_id]
               rescue StandardError => e
                 log_warn("store failed: #{e.message}")
                 nil
               end
 
-              # Retrieve a single trace by trace_id (tenant-scoped).
+              # Retrieve a single trace by trace_id (tenant/agent scoped).
               # Checks the Redis hot tier first; falls through to DB on a miss and caches the result.
               # Returns a trace hash or nil.
               def retrieve(trace_id)
                 if HotTier.available?
-                  cached = HotTier.fetch_trace(trace_id, tenant_id: @tenant_id)
+                  cached = HotTier.fetch_trace(trace_id, tenant_id: @tenant_id, agent_id: @agent_id)
                   return cached if cached
                 end
 
@@ -52,12 +52,14 @@ module Legion
 
                 row = traces_ds.where(trace_id: trace_id).first
                 trace = row ? deserialize_trace(row) : nil
-                HotTier.cache_trace(trace, tenant_id: @tenant_id) if HotTier.available? && trace
+                HotTier.cache_trace(trace, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available? && trace
                 trace
               rescue StandardError => e
                 log_warn("retrieve failed: #{e.message}")
                 nil
               end
+
+              alias get retrieve
 
               # Retrieve traces by type, ordered by strength descending.
               def retrieve_by_type(type, limit: 100, min_strength: 0.0)
@@ -105,7 +107,7 @@ module Legion
 
               # Delete a trace and its association rows.
               def delete(trace_id)
-                HotTier.evict_trace(trace_id, tenant_id: @tenant_id) if HotTier.available?
+                HotTier.evict_trace(trace_id, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available?
                 return unless db_ready?
 
                 db[ASSOCIATIONS_TABLE].where(trace_id_a: trace_id).delete
@@ -121,7 +123,7 @@ module Legion
                 return unless db_ready?
 
                 db[TRACES_TABLE].where(trace_id: trace_id).update(map_update_fields(fields))
-                HotTier.evict_trace(trace_id, tenant_id: @tenant_id) if HotTier.available?
+                HotTier.evict_trace(trace_id, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available?
               rescue StandardError => e
                 log_warn("update failed: #{e.message}")
               end
@@ -247,6 +249,15 @@ module Legion
                 retrieve_by_type(:firmware)
               end
 
+              def count
+                return 0 unless db_ready?
+
+                traces_ds.count
+              rescue StandardError => e
+                log_warn("count failed: #{e.message}")
+                0
+              end
+
               # No-op — this store is write-through; nothing to flush.
               def flush; end
 
@@ -272,9 +283,10 @@ module Legion
                 'default'
               end
 
-              # Dataset for memory_traces scoped by tenant_id (if set).
+              # Dataset for memory_traces scoped by agent_id and tenant_id (if set).
               def traces_ds
                 ds = db[TRACES_TABLE]
+                ds = ds.where(agent_id: @agent_id)
                 @tenant_id ? ds.where(tenant_id: @tenant_id) : ds
               end
 

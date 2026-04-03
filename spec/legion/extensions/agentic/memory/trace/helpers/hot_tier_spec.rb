@@ -97,6 +97,16 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::HotTier do
     end
   end
 
+  describe '.scope_id' do
+    it 'uses tenant scope when agent_id is not provided' do
+      expect(mod.scope_id(tenant_id: 'tenant-1')).to eq('tenant-1')
+    end
+
+    it 'uses combined tenant and agent scope when both are provided' do
+      expect(mod.scope_id(tenant_id: 'tenant-1', agent_id: 'agent-1')).to eq('tenant-1:agent-1')
+    end
+  end
+
   # --- serialize_trace / deserialize_trace round-trip ---
 
   describe '.serialize_trace' do
@@ -238,6 +248,12 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::HotTier do
         key = mod.trace_key(trace[:partition_id], trace_id)
         expect(Legion::Cache::RedisHash).to receive(:hset).with(key, anything)
         mod.cache_trace(trace)
+      end
+
+      it 'uses a combined tenant and agent scope when both are provided' do
+        key = mod.trace_key('tenant-abc:agent-1', trace_id)
+        expect(Legion::Cache::RedisHash).to receive(:hset).with(key, anything)
+        mod.cache_trace(trace, tenant_id: tenant_id, agent_id: 'agent-1')
       end
     end
   end

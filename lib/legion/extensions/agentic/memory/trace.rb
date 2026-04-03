@@ -17,31 +17,60 @@ module Legion
       module Memory
         module Trace
           class << self
-            # Process-wide shared store. All memory runners delegate here so that
-            # traces written by one component (ErrorTracer, coldstart, tick) are
-            # visible to every other component (dream cycle, cortex, predictions).
-            # CacheStore adds cross-process sharing via memcached on top of this.
+            # Process-wide default trace store. All memory runners delegate here so
+            # traces written by one component remain visible to the rest of the
+            # current agent runtime. Raw trace storage prefers agent-local durable
+            # state and only falls back to shared stores when explicitly requested
+            # or when local persistence is unavailable.
             def shared_store
               @shared_store ||= create_store
             end
 
+            def last_maintenance_summary
+              @maintenance_summary
+            end
+
+            def record_maintenance_summary(summary)
+              @maintenance_summary = summary
+            end
+
             def reset_store!
               @shared_store = nil
+              @maintenance_summary = nil
             end
 
             private
 
             def create_store
-              if postgres_available?
+              if local_store_available? && configured_trace_store != :shared
+                Legion::Logging.debug '[memory] Using agent-local Store (Data::Local-backed)'
+                Helpers::Store.new(partition_id: resolve_agent_id)
+              elsif postgres_available?
                 Legion::Logging.debug '[memory] Using shared PostgresStore (write-through)'
                 Helpers::PostgresStore.new(tenant_id: resolve_tenant_id, agent_id: resolve_agent_id)
               elsif defined?(Legion::Cache) && Legion::Cache.respond_to?(:connected?) && Legion::Cache.connected?
                 Legion::Logging.debug '[memory] Using shared CacheStore (memcached)'
                 Helpers::CacheStore.new
               else
-                Legion::Logging.debug '[memory] Using shared in-memory Store'
-                Helpers::Store.new
+                Legion::Logging.debug '[memory] Using agent-local in-memory Store'
+                Helpers::Store.new(partition_id: resolve_agent_id)
               end
+            end
+
+            def configured_trace_store
+              Legion::Settings.dig(:memory, :trace_store)&.to_sym
+            rescue StandardError => _e
+              nil
+            end
+
+            def local_store_available?
+              defined?(Legion::Data::Local) &&
+                Legion::Data::Local.respond_to?(:connected?) &&
+                Legion::Data::Local.connected? &&
+                Legion::Data::Local.connection&.table_exists?(:memory_traces) &&
+                Legion::Data::Local.connection.table_exists?(:memory_associations)
+            rescue StandardError => _e
+              false
             end
 
             def postgres_available?

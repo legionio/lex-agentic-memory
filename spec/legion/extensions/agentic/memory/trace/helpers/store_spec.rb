@@ -15,6 +15,14 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
       expect(result[:trace_type]).to eq(:semantic)
     end
 
+    it 'assigns the store partition_id when a trace does not already have one' do
+      semantic_trace[:partition_id] = nil
+
+      store.store(semantic_trace)
+      result = store.get(semantic_trace[:trace_id])
+      expect(result[:partition_id]).to eq('default')
+    end
+
     it 'returns nil for unknown trace_id' do
       expect(store.get('nonexistent')).to be_nil
     end
@@ -194,7 +202,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
     end
 
     it 'filters by min_strength and does not traverse beyond filtered nodes' do
-      trace_b[:strength] = 0.05
+      store.traces[trace_b[:trace_id]][:strength] = 0.05
       results = store.walk_associations(start_id: trace_a[:trace_id], min_strength: 0.1)
       found_ids = results.map { |r| r[:trace_id] }
       expect(found_ids).not_to include(trace_b[:trace_id])
@@ -212,6 +220,23 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
     it 'returns empty array for unknown start_id' do
       results = store.walk_associations(start_id: 'nonexistent-id')
       expect(results).to eq([])
+    end
+  end
+
+  describe '#restore_traces' do
+    it 'replaces existing traces and clears stale associations' do
+      store.store(semantic_trace)
+      store.store(episodic_trace)
+
+      threshold = Legion::Extensions::Agentic::Memory::Trace::Helpers::Trace::COACTIVATION_THRESHOLD
+      threshold.times { store.record_coactivation(semantic_trace[:trace_id], episodic_trace[:trace_id]) }
+
+      replacement = trace_helper.new_trace(type: :semantic, content_payload: { fact: 'replacement' })
+      store.restore_traces([replacement])
+
+      expect(store.count).to eq(1)
+      expect(store.get(semantic_trace[:trace_id])).to be_nil
+      expect(store.associations).to be_empty
     end
   end
 end

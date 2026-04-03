@@ -30,6 +30,12 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Actor::Decay do
     end
   end
 
+  describe '#args' do
+    it 'runs full maintenance when scheduled in the background' do
+      expect(actor.args).to eq({ maintenance: true })
+    end
+  end
+
   describe '#time' do
     it 'returns 60 seconds' do
       expect(actor.time).to eq(60)

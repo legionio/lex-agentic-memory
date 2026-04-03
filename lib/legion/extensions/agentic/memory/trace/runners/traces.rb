@@ -11,6 +11,7 @@ module Legion
                 store ||= default_store
                 trace = Helpers::Trace.new_trace(type: type.to_sym, content_payload: content_payload, **)
                 store.store(trace)
+                persist_store(store)
                 log.debug("[memory] stored trace #{trace[:trace_id][0..7]} type=#{trace[:trace_type]} strength=#{trace[:strength].round(2)}")
                 { trace_id: trace[:trace_id], trace_type: trace[:trace_type], strength: trace[:strength] }
               end
@@ -68,6 +69,7 @@ module Legion
               def delete_trace(trace_id:, store: nil, **)
                 store ||= default_store
                 store.delete(trace_id)
+                persist_store(store)
                 log.debug("[memory] deleted trace #{trace_id[0..7]}")
                 { deleted: true, trace_id: trace_id }
               end
@@ -85,11 +87,19 @@ module Legion
                   store.store(trace)
                 end
 
+                persist_store(store) unless top.empty?
+
                 log.debug("[memory] retrieve_and_reinforce: retrieved=#{top.size} from=#{all.size} total")
                 { count: top.size, traces: top }
               end
 
               private
+
+              def persist_store(store)
+                store.flush if store.respond_to?(:flush)
+              rescue StandardError => e
+                log.debug("[memory] persist_store skipped: #{e.message}")
+              end
 
               def default_store
                 @default_store ||= Legion::Extensions::Agentic::Memory::Trace.shared_store

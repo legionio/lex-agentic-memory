@@ -79,7 +79,7 @@ module Legion
                   reinforcement_count:     imprint_active ? 1 : 0,
                   confidence:              confidence || (type == :firmware ? 1.0 : 0.5),
                   storage_tier:            :hot,
-                  partition_id:            partition_id,
+                  partition_id:            partition_id || default_partition_id,
                   encryption_key_id:       nil,
                   associated_traces:       [],
                   parent_trace_id:         nil,
@@ -96,6 +96,12 @@ module Legion
                 return false unless trace[:strength].between?(0.0, 1.0)
 
                 true
+              end
+
+              def default_partition_id
+                Legion::Settings.dig(:agent, :id) || 'default'
+              rescue StandardError => _e
+                'default'
               end
             end
           end

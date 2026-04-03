@@ -2,6 +2,8 @@
 
 require 'sequel'
 require 'sequel/extensions/migration'
+require 'logger'
+require 'stringio'
 
 # Minimal stub for Legion::Data::Local used in persistence specs.
 # Does not require the full legion-data gem.
@@ -35,9 +37,9 @@ module Legion
         private
 
         def run_memory_migrations
-          migration_path = File.join(
-            __dir__,
-            '../lib/legion/extensions/memory/local_migrations'
+          migration_path = File.expand_path(
+            '../../../../../../lib/legion/extensions/agentic/memory/trace/local_migrations',
+            __dir__
           )
           ::Sequel::TimestampMigrator.new(@connection, migration_path).run
         end
@@ -159,6 +161,51 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       expect(second_count).to eq(first_count)
     end
 
+    it 'does not rewrite association rows when only trace fields change' do
+      store.store(semantic_trace)
+      store.store(episodic_trace)
+
+      threshold = Legion::Extensions::Agentic::Memory::Trace::Helpers::Trace::COACTIVATION_THRESHOLD
+      threshold.times { store.record_coactivation(semantic_trace[:trace_id], episodic_trace[:trace_id]) }
+      store.save_to_local
+
+      io = StringIO.new
+      logger = Logger.new(io)
+      logger.level = Logger::DEBUG
+      Legion::Data::Local.connection.loggers << logger
+
+      store.traces[semantic_trace[:trace_id]][:strength] = 0.77
+      store.save_to_local
+
+      sql = io.string
+      expect(sql).not_to match(/DELETE FROM [`"]memory_associations[`"]/)
+      expect(sql).not_to match(/INSERT INTO [`"]memory_associations[`"]/)
+    ensure
+      Legion::Data::Local.connection.loggers.delete(logger) if logger
+    end
+
+    it 'only deletes stale rows for the current partition' do
+      other_partition = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new(partition_id: 'agent-2')
+      agent_two_trace = trace_helper.new_trace(
+        type:            :episodic,
+        content_payload: { event: 'agent 2 boot' },
+        domain_tags:     ['boot'],
+        partition_id:    'agent-2'
+      )
+
+      store.store(semantic_trace)
+      other_partition.store(agent_two_trace)
+      other_partition.save_to_local
+      store.save_to_local
+
+      store.delete(semantic_trace[:trace_id])
+      store.save_to_local
+
+      db = Legion::Data::Local.connection
+      expect(db[:memory_traces].where(partition_id: 'agent-2').count).to eq(1)
+      expect(db[:memory_traces].where(trace_id: agent_two_trace[:trace_id]).count).to eq(1)
+    end
+
     it 'is a no-op when Local is not connected' do
       allow(Legion::Data::Local).to receive(:connected?).and_return(false)
       expect { store.save_to_local }.not_to raise_error
@@ -187,6 +234,29 @@ RSpec.describe 'lex-memory local SQLite persistence' do
 
       fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
       expect(fresh.associations[semantic_trace[:trace_id]]).not_to be_empty
+    end
+
+    it 'loads only traces for the requested partition' do
+      other_partition = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new(partition_id: 'agent-2')
+      agent_two_trace = trace_helper.new_trace(
+        type:            :episodic,
+        content_payload: { event: 'agent 2 boot' },
+        domain_tags:     ['boot'],
+        partition_id:    'agent-2'
+      )
+
+      store.store(semantic_trace)
+      other_partition.store(agent_two_trace)
+      store.save_to_local
+      other_partition.save_to_local
+
+      fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new(partition_id: 'default')
+      other = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new(partition_id: 'agent-2')
+
+      expect(fresh.get(semantic_trace[:trace_id])).not_to be_nil
+      expect(fresh.get(agent_two_trace[:trace_id])).to be_nil
+      expect(other.get(agent_two_trace[:trace_id])).not_to be_nil
+      expect(other.get(semantic_trace[:trace_id])).to be_nil
     end
 
     it 'is a no-op when Local is not connected' do

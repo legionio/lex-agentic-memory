@@ -12,24 +12,24 @@ module Legion
               module_function
 
               # Cache a trace in the Redis hot tier.
-              def cache_trace(trace, tenant_id: nil)
+              def cache_trace(trace, tenant_id: nil, agent_id: nil)
                 return unless available?
 
-                tid = tenant_id || trace[:partition_id]
-                key = trace_key(tid, trace[:trace_id])
+                scope = cache_scope_id(trace, tenant_id: tenant_id, agent_id: agent_id)
+                key = trace_key(scope, trace[:trace_id])
                 data = serialize_trace(trace)
                 Legion::Cache::RedisHash.hset(key, data)
                 Legion::Cache::RedisHash.expire(key, HOT_TTL)
 
-                index_key = "legion:tier:hot:#{tid}"
+                index_key = "legion:tier:hot:#{scope}"
                 Legion::Cache::RedisHash.zadd(index_key, Time.now.to_f, trace[:trace_id])
               end
 
               # Fetch a trace from the hot tier. Returns a deserialized trace hash or nil on miss.
-              def fetch_trace(trace_id, tenant_id: nil)
+              def fetch_trace(trace_id, tenant_id: nil, agent_id: nil)
                 return nil unless available?
 
-                key = trace_key(tenant_id, trace_id)
+                key = trace_key(scope_id(tenant_id: tenant_id, agent_id: agent_id), trace_id)
                 data = Legion::Cache::RedisHash.hgetall(key)
                 return nil if data.nil? || data.empty?
 
@@ -37,13 +37,14 @@ module Legion
               end
 
               # Evict a trace from the hot tier and remove it from the sorted-set index.
-              def evict_trace(trace_id, tenant_id: nil)
+              def evict_trace(trace_id, tenant_id: nil, agent_id: nil)
                 return unless available?
 
-                key = trace_key(tenant_id, trace_id)
+                scope = scope_id(tenant_id: tenant_id, agent_id: agent_id)
+                key = trace_key(scope, trace_id)
                 Legion::Cache.delete(key)
 
-                index_key = "legion:tier:hot:#{tenant_id}"
+                index_key = "legion:tier:hot:#{scope}"
                 Legion::Cache::RedisHash.zrem(index_key, trace_id)
               end
 
@@ -56,8 +57,22 @@ module Legion
               end
 
               # Build the namespaced Redis key for a trace.
-              def trace_key(tenant_id, trace_id)
-                "legion:trace:#{tenant_id}:#{trace_id}"
+              def trace_key(scope_id, trace_id)
+                "legion:trace:#{scope_id}:#{trace_id}"
+              end
+
+              def scope_id(tenant_id: nil, agent_id: nil)
+                return tenant_id if tenant_id && agent_id.nil?
+                return agent_id if agent_id && tenant_id.nil?
+
+                [tenant_id, agent_id].compact.join(':')
+              end
+
+              def cache_scope_id(trace, tenant_id: nil, agent_id: nil)
+                return scope_id(tenant_id: tenant_id, agent_id: agent_id) if agent_id
+                return tenant_id if tenant_id
+
+                trace[:partition_id]
               end
 
               # Serialize a trace hash to a string-only flat hash suitable for Redis HSET.

@@ -17,6 +17,10 @@ module Legion
                 'decay_cycle'
               end
 
+              def args
+                { maintenance: true }
+              end
+
               def time
                 60
               end

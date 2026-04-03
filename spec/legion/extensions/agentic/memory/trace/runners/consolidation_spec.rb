@@ -3,6 +3,8 @@
 require 'legion/extensions/agentic/memory/trace/client'
 
 RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Runners::Consolidation do
+  before(:each) { Legion::Extensions::Agentic::Memory::Trace.reset_store! }
+
   let(:client) { Legion::Extensions::Agentic::Memory::Trace::Client.new }
 
   describe '#reinforce' do
@@ -51,6 +53,30 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Runners::Consolidatio
   end
 
   describe '#decay_cycle' do
+    it 'defers Gaia heartbeat decay work to the background actor when maintenance is false' do
+      client.store_trace(type: :semantic, content_payload: {})
+
+      result = client.decay_cycle(maintenance: false)
+      expect(result).to include(
+        decayed:   0,
+        pruned:    0,
+        total:     1,
+        remaining: 1,
+        deferred:  true,
+        reason:    :background_decay_actor
+      )
+    end
+
+    it 'reuses the latest maintenance summary when decay is deferred' do
+      client.store_trace(type: :semantic, content_payload: {})
+      client.decay_cycle(tick_count: 100)
+
+      result = client.decay_cycle(maintenance: false)
+      expect(result[:deferred]).to be true
+      expect(result[:total]).to be >= result[:remaining]
+      expect(result[:maintained_at]).not_to be_nil
+    end
+
     it 'decays non-firmware traces' do
       client.store_trace(type: :semantic, content_payload: {})
       client.store_trace(type: :firmware, content_payload: { directive_text: 'protect' })

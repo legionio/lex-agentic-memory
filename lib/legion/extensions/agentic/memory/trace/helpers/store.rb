@@ -13,27 +13,41 @@ module Legion
             class Store
               attr_reader :traces, :associations
 
-              def initialize
+              def initialize(partition_id: nil)
                 @mutex = Mutex.new
                 @traces = {}
                 @associations = Hash.new { |h, k| h[k] = Hash.new(0) }
+                @partition_id = partition_id || resolve_partition_id
+                @traces_dirty = false
+                @associations_dirty = false
+                @persisted_trace_rows = {}
                 load_from_local
               end
 
               def store(trace)
-                @mutex.synchronize { @traces[trace[:trace_id]] = trace }
-                trace[:trace_id]
+                persisted_trace = trace.dup
+                persisted_trace[:partition_id] ||= @partition_id
+                @mutex.synchronize do
+                  @traces_dirty = true if @traces[persisted_trace[:trace_id]] != persisted_trace
+                  @traces[persisted_trace[:trace_id]] = persisted_trace
+                end
+                persisted_trace[:trace_id]
               end
 
               def get(trace_id)
-                @traces[trace_id]
+                @mutex.synchronize { @traces[trace_id] }
               end
 
               def delete(trace_id)
                 @mutex.synchronize do
-                  @traces.delete(trace_id)
-                  @associations.delete(trace_id)
+                  removed_trace = @traces.delete(trace_id)
+                  @traces.each_value { |trace| trace[:associated_traces]&.delete(trace_id) }
+
+                  removed_links = @associations.delete(trace_id)
                   @associations.each_value { |links| links.delete(trace_id) }
+
+                  @traces_dirty = true if removed_trace
+                  @associations_dirty = true if removed_trace || removed_links
                 end
               end
 
@@ -68,9 +82,11 @@ module Legion
                 @mutex.synchronize do
                   @associations[trace_id_a][trace_id_b] += 1
                   @associations[trace_id_b][trace_id_a] += 1
+                  @associations_dirty = true
 
                   threshold = Helpers::Trace::COACTIVATION_THRESHOLD
-                  link_traces(trace_id_a, trace_id_b) if @associations[trace_id_a][trace_id_b] >= threshold
+                  @traces_dirty = true if @associations[trace_id_a][trace_id_b] >= threshold &&
+                                          link_traces(trace_id_a, trace_id_b)
                 end
               end
 
@@ -80,13 +96,35 @@ module Legion
               end
 
               def count
-                @traces.size
+                @mutex.synchronize { @traces.size }
               end
 
               def synchronize(&) = @mutex.synchronize(&)
 
               def firmware_traces
                 retrieve_by_type(:firmware)
+              end
+
+              def flush
+                save_to_local
+              end
+
+              def restore_traces(traces)
+                snapshot = Array(traces).each_with_object({}) do |trace, memo|
+                  next unless trace.is_a?(Hash) && trace[:trace_id]
+
+                  restored = trace.dup
+                  restored[:partition_id] ||= @partition_id
+                  memo[restored[:trace_id]] = restored
+                end
+
+                @mutex.synchronize do
+                  @traces = snapshot
+                  @associations = Hash.new { |h, k| h[k] = Hash.new(0) }
+                  @traces_dirty = true
+                  @associations_dirty = true
+                end
+                flush
               end
 
               def walk_associations(start_id:, max_hops: 12, min_strength: 0.1)
@@ -123,28 +161,62 @@ module Legion
                 return unless Legion::Data::Local.connection.table_exists?(:memory_traces)
 
                 db = Legion::Data::Local.connection
-                traces_snapshot = @mutex.synchronize { @traces.dup }
+                snapshots = snapshot_dirty_state
+                return unless snapshots
 
-                traces_snapshot.each_value do |trace|
-                  row = serialize_trace_for_db(trace)
-                  existing = db[:memory_traces].where(trace_id: trace[:trace_id]).first
-                  if existing
-                    db[:memory_traces].where(trace_id: trace[:trace_id]).update(row)
+                traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty = snapshots
+                scoped_trace_ids = db[:memory_traces].where(partition_id: @partition_id).select_map(:trace_id)
+                memory_trace_ids = traces_snapshot.keys
+                stale_ids = persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
+                persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, associations_dirty)
+                clear_dirty_flags(trace_rows_snapshot)
+              end
+
+              def snapshot_dirty_state
+                traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty = @mutex.synchronize do
+                  ts = @traces.transform_values(&:dup)
+                  as = @associations.each_with_object({}) { |(tid, targets), memo| memo[tid] = targets.dup }
+                  trs = ts.transform_values { |trace| serialize_trace_for_db(trace) }
+                  [ts, as, trs, @traces_dirty || trs != @persisted_trace_rows, @associations_dirty]
+                end
+                return nil unless traces_dirty || associations_dirty
+
+                [traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty]
+              end
+
+              def persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
+                return [] unless traces_dirty
+
+                trace_rows_snapshot.each do |trace_id, row|
+                  if db[:memory_traces].where(trace_id: trace_id).first
+                    db[:memory_traces].where(trace_id: trace_id).update(row)
                   else
                     db[:memory_traces].insert(row)
                   end
                 end
-
-                db_trace_ids = db[:memory_traces].select_map(:trace_id)
-                memory_trace_ids = traces_snapshot.keys
-                stale_ids = db_trace_ids - memory_trace_ids
+                stale_ids = scoped_trace_ids - memory_trace_ids
                 db[:memory_traces].where(trace_id: stale_ids).delete unless stale_ids.empty?
+                stale_ids
+              end
 
-                db[:memory_associations].delete
-                @associations.each do |id_a, targets|
+              def persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, dirty)
+                assoc_scope_ids = (scoped_trace_ids + memory_trace_ids).uniq
+                return unless (dirty || !stale_ids.empty?) && !assoc_scope_ids.empty?
+
+                db[:memory_associations].where(trace_id_a: assoc_scope_ids).delete
+                db[:memory_associations].where(trace_id_b: assoc_scope_ids).delete
+                associations_snapshot.each do |id_a, targets|
                   targets.each do |id_b, count|
                     db[:memory_associations].insert(trace_id_a: id_a, trace_id_b: id_b, coactivation_count: count)
                   end
+                end
+              end
+
+              def clear_dirty_flags(trace_rows_snapshot)
+                @mutex.synchronize do
+                  @traces_dirty = false
+                  @associations_dirty = false
+                  @persisted_trace_rows = trace_rows_snapshot
                 end
               end
 
@@ -154,17 +226,30 @@ module Legion
 
                 db = Legion::Data::Local.connection
 
-                db[:memory_traces].each do |row|
+                db[:memory_traces].where(partition_id: @partition_id).each do |row|
                   @traces[row[:trace_id]] = deserialize_trace_from_db(row)
                 end
 
-                db[:memory_associations].each do |row|
-                  @associations[row[:trace_id_a]] ||= {}
-                  @associations[row[:trace_id_a]][row[:trace_id_b]] = row[:coactivation_count]
+                trace_ids = @traces.keys
+                unless trace_ids.empty?
+                  db[:memory_associations].where(trace_id_a: trace_ids).each do |row|
+                    @associations[row[:trace_id_a]] ||= {}
+                    @associations[row[:trace_id_a]][row[:trace_id_b]] = row[:coactivation_count]
+                  end
                 end
+
+                @persisted_trace_rows = @traces.transform_values { |trace| serialize_trace_for_db(trace) }
+                @traces_dirty = false
+                @associations_dirty = false
               end
 
               private
+
+              def resolve_partition_id
+                Legion::Settings.dig(:agent, :id) || 'default'
+              rescue StandardError => _e
+                'default'
+              end
 
               def serialize_trace_for_db(trace)
                 payload = trace[:content_payload] || trace[:content]
@@ -253,10 +338,19 @@ module Legion
                 return unless trace_a && trace_b
 
                 max = Helpers::Trace::MAX_ASSOCIATIONS
-                trace_a[:associated_traces] << id_b unless trace_a[:associated_traces].include?(id_b) || trace_a[:associated_traces].size >= max
-                return if trace_b[:associated_traces].include?(id_a) || trace_b[:associated_traces].size >= max
+                changed = false
 
-                trace_b[:associated_traces] << id_a
+                unless trace_a[:associated_traces].include?(id_b) || trace_a[:associated_traces].size >= max
+                  trace_a[:associated_traces] << id_b
+                  changed = true
+                end
+
+                unless trace_b[:associated_traces].include?(id_a) || trace_b[:associated_traces].size >= max
+                  trace_b[:associated_traces] << id_a
+                  changed = true
+                end
+
+                changed
               end
             end
           end

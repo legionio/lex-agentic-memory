@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22] - 2026-04-03
+
+### Changed
+- Refactor `Store#save_to_local` into `snapshot_dirty_state`, `persist_dirty_traces`, `persist_dirty_associations`, and `clear_dirty_flags` helpers to reduce cyclomatic/perceived complexity
+- Restructure `Consolidation#decay_cycle` early return to satisfy `RunnerReturnHash` cop
+- Add exception capture and logging to `Consolidation#trace_count` rescue clause
+
 ## [0.1.21] - 2026-04-01
 
 ### Changed
