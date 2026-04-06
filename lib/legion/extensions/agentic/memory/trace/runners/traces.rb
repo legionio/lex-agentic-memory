@@ -63,7 +63,7 @@ module Legion
 
                 result = scored.sort_by { |s| -s[:score] }
                 log.debug("[memory] retrieve_ranked ids=#{trace_ids.size} scored=#{result.size}")
-                result
+                { success: true, traces: result }
               end
 
               def delete_trace(trace_id:, store: nil, **)

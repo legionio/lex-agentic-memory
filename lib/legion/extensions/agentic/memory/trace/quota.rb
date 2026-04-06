@@ -25,11 +25,15 @@ module Legion
               evict_count = store.count - max_traces
               evict!(store, evict_count) if evict_count.positive?
 
+              return unless store.respond_to?(:total_bytes)
+
               overage = store.total_bytes - max_bytes
               evict!(store, estimate_eviction_count(overage)) if overage.positive?
             end
 
             def within_limits?(store)
+              return store.count <= max_traces unless store.respond_to?(:total_bytes)
+
               store.count <= max_traces && store.total_bytes <= max_bytes
             end
 
@@ -39,8 +43,14 @@ module Legion
               return if count <= 0
 
               case eviction
-              when :lru then store.delete_least_recently_used(count: count)
-              when :lowest_confidence then store.delete_lowest_confidence(count: count)
+              when :lru
+                return unless store.respond_to?(:delete_least_recently_used)
+
+                store.delete_least_recently_used(count: count)
+              when :lowest_confidence
+                return unless store.respond_to?(:delete_lowest_confidence)
+
+                store.delete_lowest_confidence(count: count)
               end
             end
 

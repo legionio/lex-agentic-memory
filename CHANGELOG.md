@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- fix retrieve_ranked to return Hash with traces key instead of bare Array for GAIA phase wiring
+- add respond_to? guards in Quota#enforce! for store methods not present on all backends
+- add lazy default_engine initialization in CognitiveImmuneMemory runner
+
 ## [0.1.24] - 2026-04-03
 
 ### Fixed
