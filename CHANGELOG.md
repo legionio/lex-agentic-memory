@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.26] - 2026-04-15
+### Changed
+- Set `mcp_tools?`, `mcp_tools_deferred?`, and `transport_required?` to `false` — internal cognitive pipeline extension
+
 ## [Unreleased]
 
 ### Fixed

@@ -5,7 +5,7 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 ## Overview
 
 **Gem**: `lex-agentic-memory`
-**Version**: 0.1.1
+**Version**: 0.1.26
 **Namespace**: `Legion::Extensions::Agentic::Memory`
 
 ## Sub-Modules
