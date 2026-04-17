@@ -11,6 +11,8 @@ module Legion
             # An index key tracks all known trace IDs.
             # Keeps a local in-memory copy for fast reads; syncs to cache on flush.
             class CacheStore
+              include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
+
               TRACE_PREFIX = 'legion:memory:trace:'
               INDEX_KEY    = 'legion:memory:trace_index'
               ASSOC_KEY    = 'legion:memory:associations'

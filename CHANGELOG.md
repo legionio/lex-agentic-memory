@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.27] - 2026-04-17
+### Fixed
+- Add missing `Legion::Logging::Helper` include to `CacheStore` — resolves `NameError: undefined local variable or method 'log'` crash on startup when Memcached is available (#23)
+
 ## [0.1.26] - 2026-04-15
 ### Changed
 - Set `mcp_tools?`, `mcp_tools_deferred?`, and `transport_required?` to `false` — internal cognitive pipeline extension
