@@ -316,15 +316,15 @@ module Legion
               end
 
               def parse_db_content(raw)
-                parsed = ::JSON.parse(raw.to_s, symbolize_names: true)
+                parsed = Legion::JSON.load(raw.to_s)
                 parsed.is_a?(Hash) ? parsed : raw
               rescue StandardError => e
                 log.error "[trace_persistence] deserialize_trace_from_db content: #{e.message}"
                 raw
               end
 
-              def parse_db_json(raw, field, symbolize: false, &default)
-                ::JSON.parse(raw.to_s, symbolize_names: symbolize)
+              def parse_db_json(raw, field, **_opts, &)
+                Legion::JSON.load(raw.to_s)
               rescue StandardError => e
                 log.error "[trace_persistence] deserialize_trace_from_db #{field}: #{e.message}"
                 yield
