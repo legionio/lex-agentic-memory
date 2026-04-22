@@ -316,10 +316,15 @@ module Legion
               end
 
               def parse_db_content(raw)
-                parsed = Legion::JSON.load(raw.to_s)
-                parsed.is_a?(Hash) ? parsed : raw
+                return raw unless raw.is_a?(String)
+
+                stripped = raw.strip
+                return raw unless stripped.start_with?('{', '[')
+
+                parsed = Legion::JSON.load(stripped)
+                parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
               rescue StandardError => e
-                log.error "[trace_persistence] deserialize_trace_from_db content: #{e.message}"
+                log.debug "[trace_persistence] malformed JSON in content column, returning raw: #{e.message}"
                 raw
               end
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.29] - 2026-04-22
+### Fixed
+- `parse_db_content` no longer attempts JSON parse on plain-text content — checks for `{`/`[` prefix before parsing, returns raw string for non-JSON content without logging errors
+
 ## [0.1.28] - 2026-04-22
 ### Fixed
 - Snapshot save/restore now logs warnings when Self/Affect module methods are unavailable instead of silently skipping
