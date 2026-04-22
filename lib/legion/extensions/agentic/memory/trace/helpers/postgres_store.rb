@@ -12,6 +12,8 @@ module Legion
             # All writes go directly to the database — no in-memory dirty tracking, no flush.
             # Scoped by tenant_id and agent_id so multiple agents can share the same DB tables safely.
             class PostgresStore
+              include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
+
               TRACES_TABLE = :memory_traces
               ASSOCIATIONS_TABLE = :memory_associations
 
@@ -267,7 +269,8 @@ module Legion
                   Legion::Data.respond_to?(:connection) &&
                   Legion::Data.connection&.table_exists?(TRACES_TABLE) &&
                   Legion::Data.connection.table_exists?(ASSOCIATIONS_TABLE)
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] db_ready?: #{e.message}"
                 false
               end
 
@@ -279,7 +282,8 @@ module Legion
 
               def resolve_agent_id
                 Legion::Settings.dig(:agent, :id) || 'default'
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] resolve_agent_id: #{e.message}"
                 'default'
               end
 
@@ -392,7 +396,8 @@ module Legion
 
                 parsed = Legion::JSON.load(raw)
                 parsed.is_a?(Hash) ? parsed : raw
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] parse_json_or_raw: #{e.message}"
                 raw
               end
 
@@ -401,7 +406,8 @@ module Legion
 
                 result = Legion::JSON.load(raw)
                 result.is_a?(Array) ? result : []
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] parse_json_array: #{e.message}"
                 []
               end
 
@@ -412,7 +418,7 @@ module Legion
               end
 
               def log_warn(message)
-                Legion::Logging.warn "[memory:postgres_store] #{message}"
+                log.warn "[trace_persistence] #{message}"
               end
             end
           end

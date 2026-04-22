@@ -9,6 +9,10 @@ module Legion
             module HotTier
               HOT_TTL = 86_400 # 24 hours
 
+              def self.log
+                Legion::Logging
+              end
+
               module_function
 
               # Cache a trace in the Redis hot tier.
@@ -52,7 +56,8 @@ module Legion
               def available?
                 defined?(Legion::Cache::RedisHash) &&
                   Legion::Cache::RedisHash.redis_available?
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] hot_tier available?: #{e.message}"
                 false
               end
 

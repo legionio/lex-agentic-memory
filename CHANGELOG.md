@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.28] - 2026-04-22
+### Fixed
+- Snapshot save/restore now logs warnings when Self/Affect module methods are unavailable instead of silently skipping
+- 26+ silent rescue blocks in trace persistence layer (postgres_store, store, hot_tier) now log errors via `log.error`
+### Changed
+- CLAUDE.md updated to document all 16 actors (was 5) and CommunicationPattern sub-module
+
 ## [0.1.27] - 2026-04-17
 ### Fixed
 - Add missing `Legion::Logging::Helper` include to `CacheStore` — resolves `NameError: undefined local variable or method 'log'` crash on startup when Memcached is available (#23)
