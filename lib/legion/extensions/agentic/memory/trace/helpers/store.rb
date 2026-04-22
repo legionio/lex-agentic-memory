@@ -323,11 +323,11 @@ module Legion
                 raw
               end
 
-              def parse_db_json(raw, field, **_opts, &)
+              def parse_db_json(raw, field, **_opts, &default)
                 Legion::JSON.load(raw.to_s)
               rescue StandardError => e
                 log.error "[trace_persistence] deserialize_trace_from_db #{field}: #{e.message}"
-                yield
+                default&.call
               end
 
               def link_traces(id_a, id_b)

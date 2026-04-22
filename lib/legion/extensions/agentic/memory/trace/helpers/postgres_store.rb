@@ -418,7 +418,7 @@ module Legion
               end
 
               def log_warn(message)
-                log.error "[trace_persistence] #{message}"
+                log.warn "[trace_persistence] #{message}"
               end
             end
           end
