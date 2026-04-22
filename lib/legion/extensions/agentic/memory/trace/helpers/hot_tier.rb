@@ -52,7 +52,8 @@ module Legion
               def available?
                 defined?(Legion::Cache::RedisHash) &&
                   Legion::Cache::RedisHash.redis_available?
-              rescue StandardError => _e
+              rescue StandardError => e
+                Legion::Logging.error "[trace_persistence] hot_tier available?: #{e.message}"
                 false
               end
 

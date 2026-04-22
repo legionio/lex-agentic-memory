@@ -32,6 +32,7 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 | `Memory::EchoChamber` | `lex-cognitive-echo-chamber` | Self-reinforcing memory patterns |
 | `Memory::ImmuneMemory` | `lex-cognitive-immune-memory` | Immune-style memory for threat patterns |
 | `Memory::Reserve` | `lex-cognitive-reserve` | Cognitive reserve capacity |
+| `Memory::CommunicationPattern` | (inline) | Tracks temporal and channel communication patterns across traces; exposes `update_patterns`, `analyze_patterns`, and `pattern_stats` runners |
 
 ## Singleton Store Pattern
 
@@ -39,11 +40,26 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 
 ## Actors
 
-- `Memory::Episodic::Actors::Decay` — interval actor, decays episodic buffer entries
-- `Memory::Semantic::Actors::Decay` — interval actor, decays semantic memory activation
-- `Memory::SourceMonitoring::Actors::Decay` — interval actor, decays source monitoring confidence
-- `Memory::Trace::Actors::Decay` — runs every 60s, executes `decay_cycle`
-- `Memory::Trace::Actors::TierMigration` — runs every 300s, migrates traces between tiers
+All actors extend `Legion::Extensions::Actors::Every` (interval-based).
+
+| Actor | Interval | Runner / Method |
+|---|---|---|
+| `Memory::Archaeology::Actor::Decay` | 120s | `CognitiveArchaeology#decay_all` |
+| `Memory::Compression::Actor::Maintenance` | 300s | `CognitiveCompression#compress_all` |
+| `Memory::Echo::Actor::Decay` | 60s | `CognitiveEcho#decay_all` |
+| `Memory::EchoChamber::Actor::Decay` | 60s | `CognitiveEchoChamber#decay_all` |
+| `Memory::Episodic::Actor::Decay` | 15s | `EpisodicBuffer#update_episodic_buffer` |
+| `Memory::ImmuneMemory::Actor::Decay` | 60s | `CognitiveImmuneMemory#decay_all` |
+| `Memory::Nostalgia::Actor::Maintenance` | 120s | `Recall#age_memories` |
+| `Memory::Palimpsest::Actor::Decay` | 60s | `CognitivePalimpsest#decay_all_ghosts` |
+| `Memory::Reserve::Actor::Maintenance` | 60s | `CognitiveReserve#update_cognitive_reserve` |
+| `Memory::Semantic::Actor::Decay` | 300s | `SemanticMemory#update_semantic_memory` |
+| `Memory::SemanticPriming::Actor::Decay` | 30s | `SemanticPriming#decay` |
+| `Memory::SemanticSatiation::Actor::Recovery` | 60s | `SemanticSatiation#recover` |
+| `Memory::SourceMonitoring::Actor::Decay` | 60s | `SourceMonitoring#update_source_monitoring` |
+| `Memory::Trace::Actor::Decay` | 60s | `Consolidation#decay_cycle` |
+| `Memory::Trace::Actor::Quota` | 300s | `Consolidation#enforce_quota` |
+| `Memory::Trace::Actor::TierMigration` | 300s | `Consolidation#migrate_tier` |
 
 ## Tick Integration
 

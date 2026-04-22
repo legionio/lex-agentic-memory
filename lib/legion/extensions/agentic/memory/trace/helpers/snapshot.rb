@@ -96,19 +96,31 @@ module Legion
                                             []
                                           end
 
+                  # NOTE: lex-agentic-self must implement these module-level methods for
+                  # personality and reflection state to be included in snapshots:
+                  #   Legion::Extensions::Agentic::Self.personality_snapshot => Hash
+                  #   Legion::Extensions::Agentic::Self.reflection_snapshot  => Array
+                  #   Legion::Extensions::Agentic::Self.restore_personality(state)
+                  #   Legion::Extensions::Agentic::Self.restore_reflections(history)
                   state[:personality_state] =
                     if defined?(Legion::Extensions::Agentic::Self) &&
                        Legion::Extensions::Agentic::Self.respond_to?(:personality_snapshot)
                       Legion::Extensions::Agentic::Self.personality_snapshot
                     else
+                      log.warn '[snapshot] Legion::Extensions::Agentic::Self.personality_snapshot unavailable — personality state skipped'
                       {}
                     end
 
+                  # NOTE: lex-agentic-affect must implement these module-level methods for
+                  # mood state to be included in snapshots:
+                  #   Legion::Extensions::Agentic::Affect.mood_snapshot => Hash
+                  #   Legion::Extensions::Agentic::Affect.restore_mood(state)
                   state[:mood_state] =
                     if defined?(Legion::Extensions::Agentic::Affect) &&
                        Legion::Extensions::Agentic::Affect.respond_to?(:mood_snapshot)
                       Legion::Extensions::Agentic::Affect.mood_snapshot
                     else
+                      log.warn '[snapshot] Legion::Extensions::Agentic::Affect.mood_snapshot unavailable — mood state skipped'
                       {}
                     end
 
@@ -124,6 +136,7 @@ module Legion
                        Legion::Extensions::Agentic::Self.respond_to?(:reflection_snapshot)
                       Legion::Extensions::Agentic::Self.reflection_snapshot
                     else
+                      log.warn '[snapshot] Legion::Extensions::Agentic::Self.reflection_snapshot unavailable — reflection history skipped'
                       []
                     end
 
@@ -151,16 +164,24 @@ module Legion
 
                 def restore_personality(personality_state)
                   return unless personality_state && !personality_state.empty?
-                  return unless defined?(Legion::Extensions::Agentic::Self) &&
-                                Legion::Extensions::Agentic::Self.respond_to?(:restore_personality)
+
+                  unless defined?(Legion::Extensions::Agentic::Self) &&
+                         Legion::Extensions::Agentic::Self.respond_to?(:restore_personality)
+                    log.warn '[snapshot] Legion::Extensions::Agentic::Self.restore_personality unavailable — personality state not restored'
+                    return
+                  end
 
                   Legion::Extensions::Agentic::Self.restore_personality(personality_state)
                 end
 
                 def restore_mood(mood_state)
                   return unless mood_state && !mood_state.empty?
-                  return unless defined?(Legion::Extensions::Agentic::Affect) &&
-                                Legion::Extensions::Agentic::Affect.respond_to?(:restore_mood)
+
+                  unless defined?(Legion::Extensions::Agentic::Affect) &&
+                         Legion::Extensions::Agentic::Affect.respond_to?(:restore_mood)
+                    log.warn '[snapshot] Legion::Extensions::Agentic::Affect.restore_mood unavailable — mood state not restored'
+                    return
+                  end
 
                   Legion::Extensions::Agentic::Affect.restore_mood(mood_state)
                 end
@@ -174,8 +195,12 @@ module Legion
 
                 def restore_reflections(reflection_history)
                   return unless reflection_history && !reflection_history.empty?
-                  return unless defined?(Legion::Extensions::Agentic::Self) &&
-                                Legion::Extensions::Agentic::Self.respond_to?(:restore_reflections)
+
+                  unless defined?(Legion::Extensions::Agentic::Self) &&
+                         Legion::Extensions::Agentic::Self.respond_to?(:restore_reflections)
+                    log.warn '[snapshot] Legion::Extensions::Agentic::Self.restore_reflections unavailable — reflection history not restored'
+                    return
+                  end
 
                   Legion::Extensions::Agentic::Self.restore_reflections(reflection_history)
                 end

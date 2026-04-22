@@ -11,6 +11,8 @@ module Legion
             # In-memory store for development and testing.
             # Production deployments should use a PostgreSQL + Redis backed store.
             class Store
+              include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
+
               attr_reader :traces, :associations
 
               def initialize(partition_id: nil)
@@ -246,7 +248,8 @@ module Legion
 
               def resolve_partition_id
                 Legion::Settings.dig(:agent, :id) || 'default'
-              rescue StandardError => _e
+              rescue StandardError => e
+                log.error "[trace_persistence] resolve_partition_id: #{e.message}"
                 'default'
               end
 
@@ -284,13 +287,7 @@ module Legion
               end
 
               def deserialize_trace_from_db(row)
-                content_raw = row[:content]
-                content = begin
-                  parsed = ::JSON.parse(content_raw, symbolize_names: true)
-                  parsed.is_a?(Hash) ? parsed : content_raw
-                rescue StandardError => _e
-                  content_raw
-                end
+                content = parse_db_content(row[:content])
                 {
                   trace_id:                row[:trace_id],
                   trace_type:              row[:trace_type]&.to_sym,
@@ -299,17 +296,9 @@ module Legion
                   strength:                row[:strength],
                   peak_strength:           row[:peak_strength],
                   base_decay_rate:         row[:base_decay_rate],
-                  emotional_valence:       begin
-                    ::JSON.parse(row[:emotional_valence], symbolize_names: true)
-                  rescue StandardError => _e
-                    0.0
-                  end,
+                  emotional_valence:       parse_db_json(row[:emotional_valence], 'emotional_valence', symbolize: true) { 0.0 },
                   emotional_intensity:     row[:emotional_intensity],
-                  domain_tags:             begin
-                    ::JSON.parse(row[:domain_tags])
-                  rescue StandardError => _e
-                    []
-                  end,
+                  domain_tags:             parse_db_json(row[:domain_tags], 'domain_tags') { [] },
                   origin:                  row[:origin]&.to_sym,
                   created_at:              row[:created_at],
                   last_reinforced:         row[:last_reinforced],
@@ -318,20 +307,27 @@ module Legion
                   confidence:              row[:confidence],
                   storage_tier:            row[:storage_tier]&.to_sym,
                   partition_id:            row[:partition_id],
-                  associated_traces:       begin
-                    ::JSON.parse(row[:associated_traces])
-                  rescue StandardError => _e
-                    []
-                  end,
+                  associated_traces:       parse_db_json(row[:associated_traces], 'associated_traces') { [] },
                   parent_trace_id:         row[:parent_id],
-                  child_trace_ids:         begin
-                    ::JSON.parse(row[:child_ids])
-                  rescue StandardError => _e
-                    []
-                  end,
+                  child_trace_ids:         parse_db_json(row[:child_ids], 'child_ids') { [] },
                   unresolved:              row[:unresolved] || false,
                   consolidation_candidate: row[:consolidation_candidate] || false
                 }
+              end
+
+              def parse_db_content(raw)
+                parsed = ::JSON.parse(raw.to_s, symbolize_names: true)
+                parsed.is_a?(Hash) ? parsed : raw
+              rescue StandardError => e
+                log.error "[trace_persistence] deserialize_trace_from_db content: #{e.message}"
+                raw
+              end
+
+              def parse_db_json(raw, field, symbolize: false, &default)
+                ::JSON.parse(raw.to_s, symbolize_names: symbolize)
+              rescue StandardError => e
+                log.error "[trace_persistence] deserialize_trace_from_db #{field}: #{e.message}"
+                yield
               end
 
               def link_traces(id_a, id_b)
