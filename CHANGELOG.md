@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.30] - 2026-04-27
+### Fixed
+- Local trace persistence now writes only changed trace rows instead of upserting every trace in the partition for a one-trace update.
+- Local association persistence now stores `partition_id` and restores associations by partition, avoiding a startup query with one giant trace-id `IN (...)` list.
+
 ## [0.1.29] - 2026-04-22
 ### Fixed
 - `parse_db_content` no longer attempts JSON parse on plain-text content — checks for `{`/`[` prefix before parsing, returns raw string for non-JSON content without logging errors

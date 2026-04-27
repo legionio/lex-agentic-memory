@@ -131,6 +131,31 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       expect(db[:memory_traces].count).to eq(1)
     end
 
+    it 'persists only the changed trace row on subsequent saves' do
+      traces = Array.new(3) do |index|
+        trace_helper.new_trace(
+          type:            :semantic,
+          content_payload: { fact: "trace #{index}" },
+          domain_tags:     ['storage']
+        )
+      end
+      traces.each { |trace| store.store(trace) }
+      store.save_to_local
+
+      io = StringIO.new
+      logger = Logger.new(io)
+      logger.level = Logger::DEBUG
+      Legion::Data::Local.connection.loggers << logger
+
+      store.traces[traces.first[:trace_id]][:strength] = 0.42
+      store.save_to_local
+
+      trace_writes = io.string.scan(/INSERT(?: OR REPLACE)? INTO [`"]memory_traces[`"]/)
+      expect(trace_writes.size).to eq(1)
+    ensure
+      Legion::Data::Local.connection.loggers.delete(logger) if logger
+    end
+
     it 'removes pruned traces from the database' do
       store.store(semantic_trace)
       store.store(episodic_trace)
@@ -320,6 +345,29 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
       count = fresh.associations[semantic_trace[:trace_id]][episodic_trace[:trace_id]]
       expect(count).to eq(threshold)
+    end
+
+    it 'loads associations by partition instead of one trace-id IN list' do
+      store.store(semantic_trace)
+      store.store(episodic_trace)
+
+      threshold = Legion::Extensions::Agentic::Memory::Trace::Helpers::Trace::COACTIVATION_THRESHOLD
+      threshold.times { store.record_coactivation(semantic_trace[:trace_id], episodic_trace[:trace_id]) }
+      store.save_to_local
+
+      io = StringIO.new
+      logger = Logger.new(io)
+      logger.level = Logger::DEBUG
+      Legion::Data::Local.connection.loggers << logger
+
+      fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
+
+      expect(fresh.associations[semantic_trace[:trace_id]][episodic_trace[:trace_id]]).to eq(threshold)
+      expect(io.string).to include('memory_associations')
+      expect(io.string).to include('partition_id')
+      expect(io.string).not_to match(/trace_id_a[`"]? IN/i)
+    ensure
+      Legion::Data::Local.connection.loggers.delete(logger) if logger
     end
   end
 end
