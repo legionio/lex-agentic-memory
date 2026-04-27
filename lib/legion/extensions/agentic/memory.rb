@@ -12,6 +12,7 @@ require_relative 'memory/echo'
 require_relative 'memory/echo_chamber'
 require_relative 'memory/immune_memory'
 require_relative 'memory/reserve'
+require_relative 'memory/consolidation'
 require_relative 'memory/trace'
 require_relative 'memory/episodic'
 require_relative 'memory/semantic'
@@ -42,6 +43,12 @@ module Legion
         def self.transport_required?
           false
         end
+
+        def self.handle_pre_compact_event(event)
+          agent_id = event[:agent_id] || event[:agent]
+          session = event[:session] || event[:transcript] || event[:messages]
+          Consolidation::PreCompact.before_compact(session: session, agent_id: agent_id)
+        end
       end
     end
   end
@@ -68,6 +75,13 @@ if defined?(Legion::Events)
 
       agent_id = (settings_loaded ? Legion::Settings.dig(:agent, :id) : nil) || 'default'
       Legion::Extensions::Agentic::Memory::Trace::Helpers::Snapshot.restore_snapshot(agent_id: agent_id)
+    end
+  end
+
+  pre_compact_enabled = settings_loaded ? Legion::Settings.dig(:memory, :pre_compact, :enabled) != false : true
+  if pre_compact_enabled
+    %w[chat.pre_compact context.pre_compact conversation.pre_compact].each do |event_name|
+      Legion::Events.on(event_name) { |event| Legion::Extensions::Agentic::Memory.handle_pre_compact_event(event) }
     end
   end
 end

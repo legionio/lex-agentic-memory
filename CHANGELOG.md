@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.31] - 2026-04-27
+### Added
+- Add a heuristic pre-compaction memory save path and synchronous pre-compaction event listeners for `chat.pre_compact`, `context.pre_compact`, and `conversation.pre_compact`.
+
+### Fixed
+- Require `legion/logging` and `legion/cache/helper` before `CacheStore` includes helper APIs, preventing `log` or cache helper methods from being skipped when the file is loaded directly.
+- Pass `CacheStore` TTL values through `cache_set` as keywords so flushes work with the shared cache helper API.
+
 ## [0.1.30] - 2026-04-27
 ### Fixed
 - Local trace persistence now writes only changed trace rows instead of upserting every trace in the partition for a one-trace update.
