@@ -13,6 +13,8 @@ module Legion
             class Store
               include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
 
+              ASSOCIATION_LOAD_BATCH_SIZE = 500
+
               attr_reader :traces, :associations
 
               def initialize(partition_id: nil)
@@ -166,49 +168,61 @@ module Legion
                 snapshots = snapshot_dirty_state
                 return unless snapshots
 
-                traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty = snapshots
+                traces_snapshot, associations_snapshot, trace_rows_snapshot, trace_changes, associations_dirty = snapshots
                 db.transaction do
                   scoped_trace_ids = db[:memory_traces].where(partition_id: @partition_id).select_map(:trace_id)
                   memory_trace_ids = traces_snapshot.keys
-                  stale_ids = persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
+                  stale_ids = scoped_trace_ids - memory_trace_ids
+                  persist_dirty_traces(db, trace_rows_snapshot, trace_changes, stale_ids)
                   persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, associations_dirty)
                 end
                 clear_dirty_flags(trace_rows_snapshot)
               end
 
               def snapshot_dirty_state
-                traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty = @mutex.synchronize do
+                traces_snapshot, associations_snapshot, trace_rows_snapshot, trace_changes, associations_dirty = @mutex.synchronize do
                   ts = @traces.transform_values(&:dup)
                   as = @associations.each_with_object({}) { |(tid, targets), memo| memo[tid] = targets.dup }
                   trs = ts.transform_values { |trace| serialize_trace_for_db(trace) }
-                  [ts, as, trs, @traces_dirty || trs != @persisted_trace_rows, @associations_dirty]
+                  changed_trace_ids = trs.each_key.reject { |trace_id| trs[trace_id] == @persisted_trace_rows[trace_id] }
+                  trace_changes = { dirty: @traces_dirty || changed_trace_ids.any?, changed_ids: changed_trace_ids }
+                  [ts, as, trs, trace_changes, @associations_dirty]
                 end
-                return nil unless traces_dirty || associations_dirty
+                return nil unless trace_changes[:dirty] || associations_dirty
 
-                [traces_snapshot, associations_snapshot, trace_rows_snapshot, traces_dirty, associations_dirty]
+                [traces_snapshot, associations_snapshot, trace_rows_snapshot, trace_changes, associations_dirty]
               end
 
-              def persist_dirty_traces(db, trace_rows_snapshot, scoped_trace_ids, memory_trace_ids, traces_dirty)
-                return [] unless traces_dirty
+              def persist_dirty_traces(db, trace_rows_snapshot, trace_changes, stale_ids)
+                return unless trace_changes[:dirty] || !stale_ids.empty?
 
                 ds = db[:memory_traces]
-                trace_rows_snapshot.each_value do |row|
-                  ds.insert_conflict(:replace).insert(row)
+                trace_changes[:changed_ids].each do |trace_id|
+                  ds.insert_conflict(:replace).insert(trace_rows_snapshot.fetch(trace_id))
                 end
-                stale_ids = scoped_trace_ids - memory_trace_ids
                 db[:memory_traces].where(trace_id: stale_ids).delete unless stale_ids.empty?
-                stale_ids
               end
 
               def persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, dirty)
                 assoc_scope_ids = (scoped_trace_ids + memory_trace_ids).uniq
                 return unless (dirty || !stale_ids.empty?) && !assoc_scope_ids.empty?
 
-                db[:memory_associations].where(trace_id_a: assoc_scope_ids).delete
-                db[:memory_associations].where(trace_id_b: assoc_scope_ids).delete
+                association_columns = db[:memory_associations].columns
+                partitioned_associations = association_columns.include?(:partition_id)
+                if partitioned_associations
+                  db[:memory_associations].where(partition_id: @partition_id).delete
+                else
+                  assoc_scope_ids.each_slice(ASSOCIATION_LOAD_BATCH_SIZE) do |ids|
+                    db[:memory_associations].where(trace_id_a: ids).delete
+                    db[:memory_associations].where(trace_id_b: ids).delete
+                  end
+                end
+
                 associations_snapshot.each do |id_a, targets|
                   targets.each do |id_b, count|
-                    db[:memory_associations].insert(trace_id_a: id_a, trace_id_b: id_b, coactivation_count: count)
+                    row = { trace_id_a: id_a, trace_id_b: id_b, coactivation_count: count }
+                    row[:partition_id] = @partition_id if partitioned_associations
+                    db[:memory_associations].insert(row)
                   end
                 end
               end
@@ -231,13 +245,7 @@ module Legion
                   @traces[row[:trace_id]] = deserialize_trace_from_db(row)
                 end
 
-                trace_ids = @traces.keys
-                unless trace_ids.empty?
-                  db[:memory_associations].where(trace_id_a: trace_ids).each do |row|
-                    @associations[row[:trace_id_a]] ||= {}
-                    @associations[row[:trace_id_a]][row[:trace_id_b]] = row[:coactivation_count]
-                  end
-                end
+                load_local_associations(db)
 
                 @persisted_trace_rows = @traces.transform_values { |trace| serialize_trace_for_db(trace) }
                 @traces_dirty = false
@@ -245,6 +253,24 @@ module Legion
               end
 
               private
+
+              def load_local_associations(db)
+                association_columns = db[:memory_associations].columns
+                if association_columns.include?(:partition_id)
+                  db[:memory_associations].where(partition_id: @partition_id).each { |row| load_association_row(row) }
+                else
+                  @traces.keys.each_slice(ASSOCIATION_LOAD_BATCH_SIZE) do |trace_ids|
+                    db[:memory_associations].where(trace_id_a: trace_ids).each { |row| load_association_row(row) }
+                  end
+                end
+              end
+
+              def load_association_row(row)
+                return unless @traces.key?(row[:trace_id_a])
+
+                @associations[row[:trace_id_a]] ||= {}
+                @associations[row[:trace_id_a]][row[:trace_id_b]] = row[:coactivation_count]
+              end
 
               def resolve_partition_id
                 Legion::Settings.dig(:agent, :id) || 'default'

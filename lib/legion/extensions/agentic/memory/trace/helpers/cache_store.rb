@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'legion/logging'
+require 'legion/cache/helper'
+
 module Legion
   module Extensions
     module Agentic
@@ -12,6 +15,7 @@ module Legion
             # Keeps a local in-memory copy for fast reads; syncs to cache on flush.
             class CacheStore
               include Legion::Logging::Helper if defined?(Legion::Logging::Helper)
+              include Legion::Cache::Helper if defined?(Legion::Cache::Helper)
 
               TRACE_PREFIX = 'legion:memory:trace:'
               INDEX_KEY    = 'legion:memory:trace_index'
@@ -194,7 +198,7 @@ module Legion
                 @dirty_ids.each_slice(FLUSH_BATCH) do |batch|
                   batch.each do |id|
                     trace = @traces[id]
-                    cache_set(trace_key(id), trace, TTL) if trace
+                    cache_set(trace_key(id), trace, ttl: TTL) if trace
                   end
                 end
               end
@@ -208,7 +212,7 @@ module Legion
               def flush_associations
                 return unless @assoc_dirty
 
-                cache_set(ASSOC_KEY, strip_default_procs(@associations), TTL)
+                cache_set(ASSOC_KEY, strip_default_procs(@associations), ttl: TTL)
                 @assoc_dirty = false
               rescue StandardError => e
                 log.warn("[memory] CacheStore flush_associations failed (#{@associations.size} entries): #{e.message}")
@@ -217,7 +221,7 @@ module Legion
               def flush_index
                 return if @dirty_ids.empty? && @deleted_ids.empty?
 
-                cache_set(INDEX_KEY, @traces.keys, TTL)
+                cache_set(INDEX_KEY, @traces.keys, ttl: TTL)
               rescue StandardError => e
                 log.warn("[memory] CacheStore flush_index failed (#{@traces.size} traces): #{e.message}")
               end
