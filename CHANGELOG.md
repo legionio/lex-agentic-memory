@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.32] - 2026-05-07
+### Fixed
+- Trace association retrieval now snapshots associated traces under the store mutex before filtering.
+- Local trace restore preserves symbol keys for JSON fields that are consumed as symbol-keyed hashes.
+
 ## [0.1.31] - 2026-04-27
 ### Added
 - Add a heuristic pre-compaction memory save path and synchronous pre-compaction event listeners for `chat.pre_compact`, `context.pre_compact`, and `conversation.pre_compact`.

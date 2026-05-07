@@ -249,6 +249,23 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       expect(fresh.get(episodic_trace[:trace_id])).not_to be_nil
     end
 
+    it 'honors symbolize parsing for JSON hash fields' do
+      trace = trace_helper.new_trace(
+        type:              :semantic,
+        content_payload:   { fact: 'symbolized' },
+        domain_tags:       ['json'],
+        emotional_valence: { joy: 0.8 }
+      )
+      store.store(trace)
+      store.save_to_local
+
+      fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
+      restored = fresh.get(trace[:trace_id])
+
+      expect(restored[:emotional_valence]).to include(joy: 0.8)
+      expect(restored[:emotional_valence]).not_to have_key('joy')
+    end
+
     it 'restores associations from the database into a fresh store' do
       store.store(semantic_trace)
       store.store(episodic_trace)
