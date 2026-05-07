@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.33] - 2026-05-07
+### Fixed
+- `PostgresStore#parse_json_or_raw` no longer attempts JSON parse on plain-text content — checks for `{`/`[` prefix before parsing, eliminating ERROR log spam during bulk reads with mixed content types
+- `PostgresStore#parse_json_array` now guards against nil/empty strings before parsing
+- `Store#parse_db_json` now short-circuits on nil/empty columns (domain_tags, associations, child_ids, emotional_valence) before attempting parse, fixing ERROR spam on traces with sparse optional fields
+
 ## [0.1.32] - 2026-05-07
 ### Fixed
 - Trace association retrieval now snapshots associated traces under the store mutex before filtering.

@@ -239,7 +239,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
 
   describe 'parse_db_json nil/empty guard (log spam regression)' do
     let(:local_db) do
-      d = ::Sequel.sqlite
+      d = Sequel.sqlite
       d.create_table(:memory_traces) do
         primary_key :id
         String   :trace_id, size: 36, null: false, unique: true
