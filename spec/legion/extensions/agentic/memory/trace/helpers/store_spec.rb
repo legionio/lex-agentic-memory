@@ -95,6 +95,18 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
       associated = store.retrieve_associated(semantic_trace[:trace_id])
       expect(associated.size).to eq(0)
     end
+
+    it 'snapshots associated traces while holding the store mutex' do
+      store.store(semantic_trace)
+      store.store(episodic_trace)
+      semantic_trace[:associated_traces] << episodic_trace[:trace_id]
+
+      mutex = store.instance_variable_get(:@mutex)
+      expect(mutex).to receive(:synchronize).and_call_original
+
+      associated = store.retrieve_associated(semantic_trace[:trace_id])
+      expect(associated.map { |trace| trace[:trace_id] }).to eq([episodic_trace[:trace_id]])
+    end
   end
 
   describe '#all_traces' do

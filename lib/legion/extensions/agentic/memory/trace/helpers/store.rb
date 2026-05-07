@@ -70,11 +70,14 @@ module Legion
               end
 
               def retrieve_associated(trace_id, min_strength: 0.0, limit: 20)
-                trace = @traces[trace_id]
-                return [] unless trace
+                associated = @mutex.synchronize do
+                  trace = @traces[trace_id]
+                  next [] unless trace
 
-                trace[:associated_traces]
-                  .filter_map { |id| @traces[id] }
+                  trace[:associated_traces].filter_map { |id| @traces[id]&.dup }
+                end
+
+                associated
                   .select { |t| t[:strength] >= min_strength }
                   .sort_by { |t| -t[:strength] }
                   .first(limit)
@@ -354,11 +357,25 @@ module Legion
                 raw
               end
 
-              def parse_db_json(raw, field, **_opts, &default)
-                Legion::JSON.load(raw.to_s)
+              def parse_db_json(raw, field, symbolize: false, &default)
+                parsed = Legion::JSON.load(raw.to_s)
+                symbolize ? symbolize_keys(parsed) : parsed
               rescue StandardError => e
                 log.error "[trace_persistence] deserialize_trace_from_db #{field}: #{e.message}"
                 default&.call
+              end
+
+              def symbolize_keys(value)
+                case value
+                when Hash
+                  value.each_with_object({}) do |(key, nested), memo|
+                    memo[key.to_sym] = symbolize_keys(nested)
+                  end
+                when Array
+                  value.map { |nested| symbolize_keys(nested) }
+                else
+                  value
+                end
               end
 
               def link_traces(id_a, id_b)
