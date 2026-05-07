@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'sequel'
+
 RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
   let(:store) { described_class.new }
   let(:trace_helper) { Legion::Extensions::Agentic::Memory::Trace::Helpers::Trace }
@@ -232,6 +234,78 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
     it 'returns empty array for unknown start_id' do
       results = store.walk_associations(start_id: 'nonexistent-id')
       expect(results).to eq([])
+    end
+  end
+
+  describe 'parse_db_json nil/empty guard (log spam regression)' do
+    let(:local_db) do
+      d = ::Sequel.sqlite
+      d.create_table(:memory_traces) do
+        primary_key :id
+        String   :trace_id, size: 36, null: false, unique: true
+        String   :trace_type, null: false, default: 'episodic'
+        String   :content, text: true, null: false, default: ''
+        Float    :strength, default: 1.0
+        Float    :peak_strength, default: 1.0
+        Float    :base_decay_rate, default: 0.02
+        Float    :emotional_valence
+        Float    :emotional_intensity, default: 0.0
+        String   :domain_tags, text: true
+        String   :origin
+        String   :storage_tier, default: 'hot'
+        DateTime :created_at
+        DateTime :last_reinforced
+        DateTime :last_decayed
+        Integer  :reinforcement_count, default: 0
+        Float    :confidence, default: 0.5
+        String   :partition_id
+        String   :associated_traces, text: true
+        String   :parent_id
+        String   :child_ids, text: true
+        TrueClass :unresolved, default: false
+        TrueClass :consolidation_candidate, default: false
+      end
+      d.create_table(:memory_associations) do
+        primary_key :id
+        String :trace_id_a, size: 36, null: false
+        String :trace_id_b, size: 36, null: false
+        Integer :coactivation_count, default: 1, null: false
+        String :partition_id
+        unique %i[trace_id_a trace_id_b]
+      end
+      d
+    end
+
+    let(:data_local_stub) do
+      conn = local_db
+      Module.new do
+        define_singleton_method(:connected?) { true }
+        define_singleton_method(:connection) { conn }
+        define_singleton_method(:table_exists?) { |name| conn.table_exists?(name) }
+      end
+    end
+
+    before { stub_const('Legion::Data::Local', data_local_stub) }
+
+    it 'does not log errors when nil optional columns are deserialized on load' do
+      local_db[:memory_traces].insert(
+        trace_id:          SecureRandom.uuid,
+        trace_type:        'episodic',
+        content:           'plain text content',
+        partition_id:      'default',
+        strength:          1.0,
+        domain_tags:       nil,
+        associated_traces: nil,
+        child_ids:         nil,
+        emotional_valence: nil
+      )
+
+      fresh = described_class.new
+      expect(fresh.count).to eq(1)
+      trace = fresh.traces.values.first
+      expect(trace[:domain_tags]).to eq([])
+      expect(trace[:associated_traces]).to eq([])
+      expect(trace[:child_trace_ids]).to eq([])
     end
   end
 

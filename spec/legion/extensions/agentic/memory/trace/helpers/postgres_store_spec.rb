@@ -556,4 +556,61 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
       expect(store.flush).to be_nil
     end
   end
+
+  # --- plain-text content round-trip (log spam regression) ---
+
+  describe 'plain-text content deserialization' do
+    it 'returns plain-text content as-is without logging errors' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: 'It appears the service is down.')
+      store.store(trace)
+
+      expect(store).not_to receive(:log)
+      result = store.retrieve(trace[:trace_id])
+      expect(result[:content]).to eq('It appears the service is down.')
+    end
+
+    it 'parses JSON object content into a hash' do
+      trace = trace_helper.new_trace(type: :semantic, content_payload: { fact: 'ruby' })
+      store.store(trace)
+
+      result = store.retrieve(trace[:trace_id])
+      expect(result[:content]).to be_a(Hash)
+    end
+
+    it 'does not log errors when domain_tags column is nil' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: 'hello')
+      store.store(trace)
+
+      db[:memory_traces].where(trace_id: trace[:trace_id]).update(domain_tags: nil)
+
+      expect(store).not_to receive(:log)
+      result = store.retrieve(trace[:trace_id])
+      expect(result[:domain_tags]).to eq([])
+    end
+
+    it 'does not log errors when associations column is nil' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: 'hello')
+      store.store(trace)
+
+      db[:memory_traces].where(trace_id: trace[:trace_id]).update(associations: nil)
+
+      expect(store).not_to receive(:log)
+      result = store.retrieve(trace[:trace_id])
+      expect(result[:associated_traces]).to eq([])
+    end
+
+    it 'generates no ERROR log lines during a bulk read with mixed content types' do
+      plain_trace = trace_helper.new_trace(type: :episodic, content_payload: 'Hello, I am plain text')
+      json_trace  = trace_helper.new_trace(type: :semantic, content_payload: { fact: 'structured' })
+      store.store(plain_trace)
+      store.store(json_trace)
+
+      log_double = double('log', debug: nil, info: nil, warn: nil)
+      allow(store).to receive(:log).and_return(log_double)
+      expect(log_double).not_to receive(:error)
+
+      results = store.all_traces
+      expect(results.size).to eq(2)
+    end
+  end
 end

@@ -358,10 +358,12 @@ module Legion
               end
 
               def parse_db_json(raw, field, symbolize: false, &default)
+                return default&.call if raw.nil? || raw.to_s.strip.empty?
+
                 parsed = Legion::JSON.load(raw.to_s)
                 symbolize ? symbolize_keys(parsed) : parsed
               rescue StandardError => e
-                log.error "[trace_persistence] deserialize_trace_from_db #{field}: #{e.message}"
+                log.debug "[trace_persistence] deserialize_trace_from_db #{field} malformed JSON: #{e.message}"
                 default&.call
               end
 
