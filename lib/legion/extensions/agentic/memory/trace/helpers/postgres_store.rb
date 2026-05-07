@@ -400,7 +400,7 @@ module Legion
                 parsed = Legion::JSON.load(stripped)
                 parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
               rescue StandardError => e
-                log.debug "[trace_persistence] parse_json_or_raw malformed JSON, returning raw: #{e.message}"
+                log.error "[trace_persistence] parse_json_or_raw: #{e.message}"
                 raw
               end
 
@@ -410,7 +410,7 @@ module Legion
                 result = Legion::JSON.load(raw)
                 result.is_a?(Array) ? result : []
               rescue StandardError => e
-                log.debug "[trace_persistence] parse_json_array malformed JSON: #{e.message}"
+                log.error "[trace_persistence] parse_json_array: #{e.message}"
                 []
               end
 
