@@ -128,6 +128,30 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Store do
     end
   end
 
+  describe '#parse_db_content' do
+    let(:parser) { described_class.allocate }
+
+    it 'returns bracket-prefixed raw log text without logging malformed JSON noise' do
+      expect(parser).not_to receive(:log)
+
+      result = parser.send(:parse_db_content, '[tool][file_read] opened file')
+
+      expect(result).to eq('[tool][file_read] opened file')
+    end
+
+    it 'still parses JSON object content' do
+      result = parser.send(:parse_db_content, '{"event":"meeting"}')
+
+      expect(result).to eq({ event: 'meeting' })
+    end
+
+    it 'still parses JSON array content when it looks like serialized payload data' do
+      result = parser.send(:parse_db_content, '[{"event":"meeting"}]')
+
+      expect(result).to eq([{ event: 'meeting' }])
+    end
+  end
+
   describe '#count' do
     it 'returns number of stored traces' do
       expect(store.count).to eq(0)

@@ -24,6 +24,14 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Client do
     expect(client).to respond_to(:erase_by_agent)
   end
 
+  it 'does not initialize the shared trace store until a store-backed operation needs it' do
+    allow(Legion::Extensions::Agentic::Memory::Trace).to receive(:shared_store)
+
+    described_class.new
+
+    expect(Legion::Extensions::Agentic::Memory::Trace).not_to have_received(:shared_store)
+  end
+
   it 'uses provided store' do
     store = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
     client = described_class.new(store: store)

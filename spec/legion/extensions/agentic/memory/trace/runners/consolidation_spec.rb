@@ -53,6 +53,23 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Runners::Consolidatio
   end
 
   describe '#decay_cycle' do
+    it 'does not initialize the shared store when Gaia defers heartbeat maintenance' do
+      runner = Object.new.extend(described_class)
+      allow(Legion::Extensions::Agentic::Memory::Trace).to receive(:shared_store)
+
+      result = runner.decay_cycle(maintenance: false)
+
+      expect(Legion::Extensions::Agentic::Memory::Trace).not_to have_received(:shared_store)
+      expect(result).to include(
+        decayed:   0,
+        pruned:    0,
+        total:     0,
+        remaining: 0,
+        deferred:  true,
+        reason:    :background_decay_actor
+      )
+    end
+
     it 'defers Gaia heartbeat decay work to the background actor when maintenance is false' do
       client.store_trace(type: :semantic, content_payload: {})
 

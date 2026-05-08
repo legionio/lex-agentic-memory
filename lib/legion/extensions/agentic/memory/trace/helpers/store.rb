@@ -348,13 +348,20 @@ module Legion
                 return raw unless raw.is_a?(String)
 
                 stripped = raw.strip
-                return raw unless stripped.start_with?('{', '[')
+                return raw unless parseable_content_json?(stripped)
 
                 parsed = Legion::JSON.load(stripped)
                 parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
-              rescue StandardError => e
-                log.debug "[trace_persistence] malformed JSON in content column, returning raw: #{e.message}"
+              rescue StandardError => _e
                 raw
+              end
+
+              def parseable_content_json?(value)
+                return true if value.start_with?('{')
+                return false unless value.start_with?('[')
+
+                first_array_value = value[1..]&.lstrip&.[](0)
+                %w[{ [ " ]].include?(first_array_value)
               end
 
               def parse_db_json(raw, field, symbolize: false, &default)

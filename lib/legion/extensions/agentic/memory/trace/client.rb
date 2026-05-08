@@ -18,12 +18,14 @@ module Legion
             attr_reader :store
 
             def initialize(store: nil, **)
-              @default_store = store || Legion::Extensions::Agentic::Memory::Trace.shared_store
+              @default_store = store if store
             end
 
             private
 
-            attr_reader :default_store
+            def default_store
+              @default_store ||= Legion::Extensions::Agentic::Memory::Trace.shared_store
+            end
           end
         end
       end
