@@ -31,12 +31,12 @@ module Legion
               end
 
               def decay_cycle(store: nil, tick_count: 1, maintenance: true, **)
-                store ||= default_store
                 unless maintenance
-                  deferred = deferred_decay_summary(store)
+                  deferred = deferred_decay_summary(store || cached_default_store)
                   return { **deferred }
                 end
 
+                store ||= default_store
                 decayed = 0
                 pruned = 0
                 total = trace_count(store)
@@ -139,7 +139,7 @@ module Legion
 
               def deferred_decay_summary(store)
                 summary = Legion::Extensions::Agentic::Memory::Trace.last_maintenance_summary || {}
-                current_count = trace_count(store)
+                current_count = store ? trace_count(store) : 0
 
                 {
                   decayed:       summary[:decayed] || 0,
@@ -171,6 +171,10 @@ module Legion
 
               def default_store
                 @default_store ||= Legion::Extensions::Agentic::Memory::Trace.shared_store
+              end
+
+              def cached_default_store
+                @default_store if instance_variable_defined?(:@default_store)
               end
 
               include Legion::Extensions::Helpers::Lex if defined?(Legion::Extensions::Helpers::Lex)

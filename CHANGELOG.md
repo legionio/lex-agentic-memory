@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.34] - 2026-05-08
+### Fixed
+- Deferred GAIA heartbeat maintenance no longer initializes the shared trace store just to return a deferred summary, avoiding idle local trace table scans.
+- `Store#parse_db_content` now returns bracket-prefixed raw trace/log text without JSON parse attempts or malformed JSON debug noise while still parsing real JSON objects and arrays.
+
 ## [0.1.33] - 2026-05-07
 ### Fixed
 - `PostgresStore#parse_json_or_raw` no longer attempts JSON parse on plain-text content — checks for `{`/`[` prefix before parsing, eliminating ERROR log spam during bulk reads with mixed content types
