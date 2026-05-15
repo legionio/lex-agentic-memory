@@ -29,7 +29,7 @@ module Legion
               end
 
               def store(trace)
-                persisted_trace = trace.dup
+                persisted_trace = Helpers::Trace.normalize_trace_affect(trace)
                 persisted_trace[:partition_id] ||= @partition_id
                 @mutex.synchronize do
                   @traces_dirty = true if @traces[persisted_trace[:trace_id]] != persisted_trace
@@ -120,7 +120,7 @@ module Legion
                 snapshot = Array(traces).each_with_object({}) do |trace, memo|
                   next unless trace.is_a?(Hash) && trace[:trace_id]
 
-                  restored = trace.dup
+                  restored = Helpers::Trace.normalize_trace_affect(trace)
                   restored[:partition_id] ||= @partition_id
                   memo[restored[:trace_id]] = restored
                 end
@@ -294,7 +294,7 @@ module Legion
                   strength:                trace[:strength],
                   peak_strength:           trace[:peak_strength],
                   base_decay_rate:         trace[:base_decay_rate],
-                  emotional_valence:       trace[:emotional_valence].is_a?(Hash) ? ::JSON.generate(trace[:emotional_valence]) : nil,
+                  emotional_valence:       Helpers::Trace.normalize_emotional_valence(trace[:emotional_valence]).to_s,
                   emotional_intensity:     trace[:emotional_intensity],
                   domain_tags:             trace[:domain_tags].is_a?(Array) ? ::JSON.generate(trace[:domain_tags]) : nil,
                   origin:                  trace[:origin].to_s,
@@ -325,7 +325,7 @@ module Legion
                   strength:                row[:strength],
                   peak_strength:           row[:peak_strength],
                   base_decay_rate:         row[:base_decay_rate],
-                  emotional_valence:       parse_db_json(row[:emotional_valence], 'emotional_valence', symbolize: true) { 0.0 },
+                  emotional_valence:       deserialize_emotional_valence(row[:emotional_valence]),
                   emotional_intensity:     row[:emotional_intensity],
                   domain_tags:             parse_db_json(row[:domain_tags], 'domain_tags') { [] },
                   origin:                  row[:origin]&.to_sym,
@@ -362,6 +362,12 @@ module Legion
 
                 first_array_value = value[1..]&.lstrip&.[](0)
                 %w[{ [ " ]].include?(first_array_value)
+              end
+
+              def deserialize_emotional_valence(raw)
+                return 0.0 if raw.nil? || raw.to_s.strip.empty?
+
+                Helpers::Trace.normalize_emotional_valence(raw)
               end
 
               def parse_db_json(raw, field, symbolize: false, &default)

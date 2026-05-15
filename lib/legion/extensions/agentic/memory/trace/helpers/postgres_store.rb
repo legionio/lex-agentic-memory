@@ -27,15 +27,16 @@ module Legion
               def store(trace)
                 return nil unless db_ready?
 
-                row = serialize_trace(trace)
+                normalized_trace = Helpers::Trace.normalize_trace_affect(trace)
+                row = serialize_trace(normalized_trace)
                 ds  = db[TRACES_TABLE]
                 if db.adapter_scheme == :mysql2
                   ds.insert_conflict(update: row.except(:trace_id)).insert(row)
                 else
                   ds.insert_conflict(target: :trace_id, update: row.except(:trace_id)).insert(row)
                 end
-                HotTier.cache_trace(trace, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available?
-                trace[:trace_id]
+                HotTier.cache_trace(normalized_trace, tenant_id: @tenant_id, agent_id: @agent_id) if HotTier.available?
+                normalized_trace[:trace_id]
               rescue StandardError => e
                 log_warn("store failed: #{e.message}")
                 nil
@@ -299,7 +300,7 @@ module Legion
                 tags    = trace[:domain_tags]
                 assocs  = trace[:associated_traces]
                 conf    = trace[:confidence]
-                ev      = trace[:emotional_valence]
+                ev      = Helpers::Trace.normalize_emotional_valence(trace[:emotional_valence])
 
                 {
                   trace_id:                trace[:trace_id],
@@ -314,8 +315,8 @@ module Legion
                   strength:                trace[:strength],
                   peak_strength:           trace[:peak_strength],
                   base_decay_rate:         trace[:base_decay_rate],
-                  emotional_valence:       ev.is_a?(Numeric) ? ev.to_f : 0.0,
-                  emotional_intensity:     trace[:emotional_intensity],
+                  emotional_valence:       ev,
+                  emotional_intensity:     Helpers::Trace.normalize_emotional_intensity(trace[:emotional_intensity]),
                   origin:                  sanitize_pg_string(trace[:origin].to_s),
                   source_agent_id:         sanitize_pg_string(trace[:source_agent_id]),
                   storage_tier:            sanitize_pg_string(trace[:storage_tier].to_s),
