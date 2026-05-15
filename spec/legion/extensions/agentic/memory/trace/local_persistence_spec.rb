@@ -249,12 +249,12 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       expect(fresh.get(episodic_trace[:trace_id])).not_to be_nil
     end
 
-    it 'honors symbolize parsing for JSON hash fields' do
+    it 'restores numeric emotional_valence values from local persistence' do
       trace = trace_helper.new_trace(
         type:              :semantic,
         content_payload:   { fact: 'symbolized' },
         domain_tags:       ['json'],
-        emotional_valence: { joy: 0.8 }
+        emotional_valence: 0.8
       )
       store.store(trace)
       store.save_to_local
@@ -262,8 +262,25 @@ RSpec.describe 'lex-memory local SQLite persistence' do
       fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
       restored = fresh.get(trace[:trace_id])
 
-      expect(restored[:emotional_valence]).to include(joy: 0.8)
-      expect(restored[:emotional_valence]).not_to have_key('joy')
+      expect(restored[:emotional_valence]).to be_within(0.001).of(0.8)
+    end
+
+    it 'normalizes legacy JSON emotional_valence payloads on load' do
+      trace = trace_helper.new_trace(
+        type:            :semantic,
+        content_payload: { fact: 'legacy' },
+        domain_tags:     ['json']
+      )
+      store.store(trace)
+      store.save_to_local
+
+      db = Legion::Data::Local.connection
+      db[:memory_traces].where(trace_id: trace[:trace_id]).update(emotional_valence: '{"valence":0.8}')
+
+      fresh = Legion::Extensions::Agentic::Memory::Trace::Helpers::Store.new
+      restored = fresh.get(trace[:trace_id])
+
+      expect(restored[:emotional_valence]).to be_within(0.001).of(0.8)
     end
 
     it 'restores associations from the database into a fresh store' do

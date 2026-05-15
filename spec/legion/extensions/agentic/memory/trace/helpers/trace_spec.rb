@@ -36,6 +36,30 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::Trace do
       expect(trace[:emotional_intensity]).to eq(0.0)
     end
 
+    it 'normalizes string and structured emotional values safely' do
+      trace = described_class.new_trace(
+        type:                :episodic,
+        content_payload:     { event: 'partner ping' },
+        emotional_valence:   '{:urgency=>0.6, :importance=>0.8}',
+        emotional_intensity: '0.75'
+      )
+
+      expect(trace[:emotional_valence]).to eq(0.0)
+      expect(trace[:emotional_intensity]).to eq(0.75)
+    end
+
+    it 'extracts scalar valence from hash payloads when an explicit valence key exists' do
+      trace = described_class.new_trace(
+        type:                :semantic,
+        content_payload:     { fact: 'test' },
+        emotional_valence:   { valence: 0.4 },
+        emotional_intensity: '2.0'
+      )
+
+      expect(trace[:emotional_valence]).to eq(0.4)
+      expect(trace[:emotional_intensity]).to eq(1.0)
+    end
+
     it 'rejects invalid trace types' do
       expect do
         described_class.new_trace(type: :bogus, content_payload: {})

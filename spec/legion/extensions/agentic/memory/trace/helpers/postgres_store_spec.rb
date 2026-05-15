@@ -238,6 +238,20 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
     end
   end
 
+  describe 'emotional valence normalization' do
+    it 'normalizes string-backed affect fields before persisting' do
+      trace = trace_helper.new_trace(type: :episodic, content_payload: { event: 'partner ping' })
+      trace[:emotional_valence] = '0.7'
+      trace[:emotional_intensity] = '0.9'
+
+      store.store(trace)
+
+      row = db[:memory_traces].where(trace_id: trace[:trace_id]).first
+      expect(row[:emotional_valence]).to be_within(0.001).of(0.7)
+      expect(row[:emotional_intensity]).to be_within(0.001).of(0.9)
+    end
+  end
+
   # --- retrieve_by_type ---
 
   describe '#retrieve_by_type' do

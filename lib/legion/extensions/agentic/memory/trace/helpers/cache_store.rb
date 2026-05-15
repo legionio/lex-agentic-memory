@@ -38,11 +38,12 @@ module Legion
               end
 
               def store(trace)
+                normalized_trace = Helpers::Trace.normalize_trace_affect(trace)
                 @mutex.synchronize do
-                  @traces[trace[:trace_id]] = trace
-                  @dirty_ids << trace[:trace_id]
+                  @traces[normalized_trace[:trace_id]] = normalized_trace
+                  @dirty_ids << normalized_trace[:trace_id]
                 end
-                trace[:trace_id]
+                normalized_trace[:trace_id]
               end
 
               def get(trace_id)
