@@ -81,8 +81,11 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
   end
 
   before do
+    allow(Legion::Data).to receive(:respond_to?).and_call_original
     allow(Legion::Data).to receive(:respond_to?).with(:connection).and_return(true)
     allow(Legion::Data).to receive(:connection).and_return(db)
+    allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(true)
+    allow(Legion::Data).to receive(:can_write?).with(:memory_associations).and_return(true)
     # SQLite adapter_scheme is :sqlite — postgres_available? checks for :postgres/:mysql2,
     # but PostgresStore itself only calls db_ready? which just needs the tables to exist.
     allow(db).to receive(:adapter_scheme).and_return(:sqlite)
@@ -108,6 +111,27 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
     it 'returns false when Legion::Data.connection raises' do
       allow(Legion::Data).to receive(:connection).and_raise(StandardError, 'no db')
       expect(store.db_ready?).to be false
+    end
+
+    it 'returns false when user lacks INSERT privilege on memory_traces' do
+      allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(false)
+      expect(store.db_ready?).to be false
+    end
+
+    it 'returns true when user has INSERT privilege on memory_traces' do
+      allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(true)
+      expect(store.db_ready?).to be true
+    end
+
+    it 'returns false when user lacks INSERT privilege on memory_associations' do
+      allow(Legion::Data).to receive(:can_write?).with(:memory_associations).and_return(false)
+      expect(store.db_ready?).to be false
+    end
+
+    it 'returns true when user has INSERT privilege on both tables' do
+      allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(true)
+      allow(Legion::Data).to receive(:can_write?).with(:memory_associations).and_return(true)
+      expect(store.db_ready?).to be true
     end
   end
 

@@ -65,6 +65,9 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Hologram::Helpers::HologramE
     let(:fragments) { engine.fragment_hologram(hologram_id: hologram.id, count: 4) }
 
     it 'returns success: true when sufficient fragments are used' do
+      # Enhance all fragments to guarantee they exceed the reconstruction threshold
+      # regardless of the random completeness assigned during fragmentation.
+      fragments.each { |f| f.enhance!(0.5) }
       ids = fragments.select(&:sufficient?).map(&:id)
       result = engine.reconstruct_from_fragments(hologram_id: hologram.id, fragment_ids: ids)
       expect(result[:success]).to be true
