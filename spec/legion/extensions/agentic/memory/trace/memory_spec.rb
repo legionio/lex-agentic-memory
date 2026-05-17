@@ -35,7 +35,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace do
       expect(described_class.shared_store).to eq(:shared_store)
     end
 
-    it 'falls back from Postgres when user lacks INSERT privilege' do
+    it 'falls back from Postgres when user lacks INSERT privilege on memory_traces' do
       allow(described_class).to receive(:local_store_available?).and_return(false)
       allow(described_class).to receive(:configured_trace_store).and_return(nil)
       allow(described_class).to receive(:resolve_agent_id).and_return('agent-1')
@@ -46,6 +46,26 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace do
       allow(Legion::Data).to receive(:respond_to?).with(:connection).and_return(true)
       allow(Legion::Data).to receive(:connection).and_return(conn)
       allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(false)
+      allow(Legion::Data).to receive(:can_write?).with(:memory_associations).and_return(true)
+
+      allow(Legion::Cache).to receive(:respond_to?).with(:connected?).and_return(false)
+      allow(described_class::Helpers::Store).to receive(:new).with(partition_id: 'agent-1').and_return(:fallback_store)
+
+      expect(described_class.shared_store).to eq(:fallback_store)
+    end
+
+    it 'falls back from Postgres when user lacks INSERT privilege on memory_associations' do
+      allow(described_class).to receive(:local_store_available?).and_return(false)
+      allow(described_class).to receive(:configured_trace_store).and_return(nil)
+      allow(described_class).to receive(:resolve_agent_id).and_return('agent-1')
+
+      conn = double('connection', adapter_scheme: :postgres)
+      allow(conn).to receive(:table_exists?).and_return(true)
+      allow(Legion::Data).to receive(:respond_to?).and_call_original
+      allow(Legion::Data).to receive(:respond_to?).with(:connection).and_return(true)
+      allow(Legion::Data).to receive(:connection).and_return(conn)
+      allow(Legion::Data).to receive(:can_write?).with(:memory_traces).and_return(true)
+      allow(Legion::Data).to receive(:can_write?).with(:memory_associations).and_return(false)
 
       allow(Legion::Cache).to receive(:respond_to?).with(:connected?).and_return(false)
       allow(described_class::Helpers::Store).to receive(:new).with(partition_id: 'agent-1').and_return(:fallback_store)

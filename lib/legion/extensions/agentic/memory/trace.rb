@@ -80,7 +80,8 @@ module Legion
                 %i[postgres mysql2].include?(Legion::Data.connection.adapter_scheme) &&
                 Legion::Data.connection.table_exists?(:memory_traces) &&
                 Legion::Data.connection.table_exists?(:memory_associations) &&
-                Legion::Data.can_write?(:memory_traces)
+                Legion::Data.can_write?(:memory_traces) &&
+                Legion::Data.can_write?(:memory_associations)
             rescue StandardError => _e
               false
             end
