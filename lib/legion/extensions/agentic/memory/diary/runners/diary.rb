@@ -23,6 +23,8 @@ module Legion
 
               def read_diary(limit: Helpers::Constants::DEFAULT_LIMIT, since: nil, store: nil, **)
                 s = store || diary_store
+                return { success: false, error: 'diary store not available' } unless s.db_ready?
+
                 entries = s.read(limit: limit, since: since)
                 log.debug("[diary] read #{entries.size} entries for agent=#{s.agent_id}")
                 { success: true, entries: entries, count: entries.size }
@@ -30,6 +32,8 @@ module Legion
 
               def search_diary(query:, limit: Helpers::Constants::DEFAULT_LIMIT, store: nil, **)
                 s = store || diary_store
+                return { success: false, error: 'diary store not available' } unless s.db_ready?
+
                 entries = s.search(query: query, limit: limit)
                 log.debug("[diary] search query=#{query} found=#{entries.size} agent=#{s.agent_id}")
                 { success: true, entries: entries, count: entries.size }

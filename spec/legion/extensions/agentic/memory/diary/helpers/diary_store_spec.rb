@@ -110,11 +110,11 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Diary::Helpers::DiaryStore d
       store.write(session_id: 'sess-3', content: 'third entry', tags: %w[debug])
     end
 
-    it 'returns entries in reverse chronological order' do
+    it 'returns entries in chronological order (oldest first)' do
       entries = store.read
       expect(entries.size).to eq(3)
-      expect(entries.first[:content]).to eq('third entry')
-      expect(entries.last[:content]).to eq('first entry')
+      expect(entries.first[:content]).to eq('first entry')
+      expect(entries.last[:content]).to eq('third entry')
     end
 
     it 'respects the limit parameter' do
@@ -136,7 +136,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Diary::Helpers::DiaryStore d
 
     it 'deserializes tags as an array' do
       entries = store.read(limit: 1)
-      expect(entries.first[:tags]).to eq(['debug'])
+      expect(entries.first[:tags]).to eq(['boot'])
     end
 
     it 'returns empty array when db not ready' do

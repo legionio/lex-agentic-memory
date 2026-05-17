@@ -27,8 +27,8 @@ module Legion
                   agent_id:   @agent_id,
                   session_id: session_id,
                   content:    sanitize(content.to_s[0...Constants::MAX_CONTENT_SIZE]),
-                  tags:       tags.is_a?(Array) ? ::JSON.generate(tags) : '[]',
-                  metadata:   metadata.is_a?(Hash) ? ::JSON.generate(metadata) : '{}',
+                  tags:       tags.is_a?(Array) ? Legion::JSON.dump(tags) : '[]',
+                  metadata:   metadata.is_a?(Hash) ? Legion::JSON.dump(metadata) : '{}',
                   created_at: now
                 }
                 db[Constants::TABLE_NAME].insert(row)
@@ -42,7 +42,7 @@ module Legion
                 return [] unless db_ready?
 
                 effective_limit = [limit, Constants::MAX_LIMIT].min
-                ds = scoped_ds.order(Sequel.desc(:created_at)).limit(effective_limit)
+                ds = scoped_ds.order(Sequel.asc(:created_at)).limit(effective_limit)
                 ds = ds.where { created_at >= since } if since
                 ds.all.map { |row| deserialize(row) }
               rescue StandardError => e

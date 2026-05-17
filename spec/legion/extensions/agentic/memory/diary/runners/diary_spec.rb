@@ -87,6 +87,13 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Diary::Runners::Diary do
       result = runner.read_diary(limit: 1)
       expect(result[:count]).to eq(1)
     end
+
+    it 'returns failure when store is not available' do
+      allow(Legion::Data::Local).to receive(:connected?).and_return(false)
+      result = runner.read_diary
+      expect(result[:success]).to be false
+      expect(result[:error]).to eq('diary store not available')
+    end
   end
 
   describe '#search_diary' do
@@ -104,6 +111,13 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Diary::Runners::Diary do
     it 'returns empty for no match' do
       result = runner.search_diary(query: 'nonexistent')
       expect(result[:count]).to eq(0)
+    end
+
+    it 'returns failure when store is not available' do
+      allow(Legion::Data::Local).to receive(:connected?).and_return(false)
+      result = runner.search_diary(query: 'caching')
+      expect(result[:success]).to be false
+      expect(result[:error]).to eq('diary store not available')
     end
   end
 

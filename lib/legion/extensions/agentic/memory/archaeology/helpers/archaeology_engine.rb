@@ -164,9 +164,9 @@ module Legion
                 site.survey.merge(
                   depth_progress: depth_progress(site),
                   artifact_types: site.artifacts_found
-                                      .each_with_object(Hash.new(0)) do |a, h|
-                                        h[a.artifact_type] += 1
-                                      end
+                                  .each_with_object(Hash.new(0)) do |a, h|
+                                    h[a.artifact_type] += 1
+                                  end
                 )
               end
 
