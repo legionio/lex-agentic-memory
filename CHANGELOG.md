@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.36] - 2026-05-17
+### Fixed
+- `PostgresStore#db_ready?` now checks `Legion::Data.can_write?(:memory_traces)` before attempting writes, preventing `PG::InsufficientPrivilege` errors when connected with a read-only role.
+- `Trace.postgres_available?` also checks INSERT privilege so `create_store` correctly falls back to a local store instead of selecting PostgresStore and failing at runtime.
+
 ## [0.1.34] - 2026-05-08
 ### Fixed
 - Deferred GAIA heartbeat maintenance no longer initializes the shared trace store just to return a deferred summary, avoiding idle local trace table scans.

@@ -264,12 +264,13 @@ module Legion
               # No-op — this store is write-through; nothing to flush.
               def flush; end
 
-              # Returns true when both required tables exist in the connected DB.
+              # Returns true when both required tables exist and the user has INSERT privilege.
               def db_ready?
                 defined?(Legion::Data) &&
                   Legion::Data.respond_to?(:connection) &&
                   Legion::Data.connection&.table_exists?(TRACES_TABLE) &&
-                  Legion::Data.connection.table_exists?(ASSOCIATIONS_TABLE)
+                  Legion::Data.connection.table_exists?(ASSOCIATIONS_TABLE) &&
+                  Legion::Data.can_write?(TRACES_TABLE)
               rescue StandardError => e
                 log.error "[trace_persistence] db_ready?: #{e.message}"
                 false
