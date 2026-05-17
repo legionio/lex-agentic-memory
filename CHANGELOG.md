@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.37] - 2026-05-17
+### Added
+- `Memory::Diary` sub-module — per-agent chronological session diary with write, read, and search.
+- `DiaryStore` backed by `Legion::Data::Local` (SQLite) with agent-scoped isolation.
+- Local migration `20260517000001_create_memory_diary_entries` for diary table.
+- `Diary::Client` and `Runners::Diary` for runner integration (write_diary, read_diary, search_diary, diary_stats).
+- Module-level convenience API: `Memory::Diary.write`, `.read`, `.search`.
+
 ## [0.1.34] - 2026-05-08
 ### Fixed
 - Deferred GAIA heartbeat maintenance no longer initializes the shared trace store just to return a deferred summary, avoiding idle local trace table scans.
