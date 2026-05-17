@@ -21,6 +21,7 @@ require_relative 'memory/semantic_satiation'
 require_relative 'memory/source_monitoring'
 require_relative 'memory/transfer'
 require_relative 'memory/communication_pattern'
+require_relative 'memory/diary'
 
 module Legion
   module Extensions

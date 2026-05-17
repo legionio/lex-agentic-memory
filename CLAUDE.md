@@ -4,10 +4,10 @@
 
 ## What Is This Gem?
 
-Domain consolidation gem for memory storage, retrieval, and consolidation. Bundles 19 sub-modules into one loadable unit under `Legion::Extensions::Agentic::Memory`.
+Domain consolidation gem for memory storage, retrieval, and consolidation. Bundles 20 sub-modules into one loadable unit under `Legion::Extensions::Agentic::Memory`.
 
 **Gem**: `lex-agentic-memory`
-**Version**: 0.1.28
+**Version**: 0.1.37
 **Namespace**: `Legion::Extensions::Agentic::Memory`
 
 ## Sub-Modules
@@ -33,6 +33,7 @@ Domain consolidation gem for memory storage, retrieval, and consolidation. Bundl
 | `Memory::ImmuneMemory` | `lex-cognitive-immune-memory` | Immune-style memory for threat patterns | `decay_all`, `cognitive_immune_memory` |
 | `Memory::Reserve` | `lex-cognitive-reserve` | Cognitive reserve capacity | `update_cognitive_reserve`, `reserve_status` |
 | `Memory::CommunicationPattern` | (inline) | Tracks temporal and channel communication patterns across traces | `update_patterns`, `analyze_patterns`, `pattern_stats` |
+| `Memory::Diary` | (inline) | Per-agent chronological session diary — isolated memory wings | `write_diary`, `read_diary`, `search_diary`, `diary_stats` |
 
 ## Singleton Store Pattern
 

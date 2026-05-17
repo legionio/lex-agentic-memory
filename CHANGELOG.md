@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.37] - 2026-05-17
+### Added
+- `Memory::Diary` sub-module — per-agent chronological session diary with write, read, and search.
+- `DiaryStore` backed by `Legion::Data::Local` (SQLite) with agent-scoped isolation.
+- Local migration `20260517000001_create_memory_diary_entries` for diary table.
+- `Diary::Client` and `Runners::Diary` for runner integration (write_diary, read_diary, search_diary, diary_stats).
+- Module-level convenience API: `Memory::Diary.write`, `.read`, `.search`.
+
 ## [0.1.36] - 2026-05-17
 ### Fixed
 - `PostgresStore#db_ready?` now checks `Legion::Data.can_write?(:memory_traces)` before attempting writes, preventing `PG::InsufficientPrivilege` errors when connected with a read-only role.
