@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.38] - 2026-05-27
+### Fixed
+- `PostgresStore#parse_json_or_raw` now requires matching start/end delimiters (`{}`/`[]`) before attempting JSON parse — eliminates 100k+/day error log spam from bracket-prefixed text content (e.g. `[trace_persistence] ...`) that triggered a self-amplifying feedback loop via RabbitMQ logging
+- `PostgresStore#parse_json_array` applies same delimiter guard
+- Removed error-level logging from JSON parse fallback path — non-parseable content is the expected "or_raw" code path, not an error condition
+
 ## [0.1.37] - 2026-05-17
 ### Added
 - `Memory::Diary` sub-module — per-agent chronological session diary with write, read, and search.

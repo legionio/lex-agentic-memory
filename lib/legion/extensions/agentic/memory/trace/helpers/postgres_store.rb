@@ -398,22 +398,26 @@ module Legion
                 return raw unless raw.is_a?(String)
 
                 stripped = raw.strip
-                return raw unless stripped.start_with?('{', '[')
+                return raw unless (stripped.start_with?('{') && stripped.end_with?('}')) ||
+                                  (stripped.start_with?('[') && stripped.end_with?(']'))
 
                 parsed = Legion::JSON.load(stripped)
                 parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
               rescue StandardError => e
-                log.error "[trace_persistence] parse_json_or_raw: #{e.message}"
+                log.debug "[trace_persistence] parse_json_or_raw: #{e.message}"
                 raw
               end
 
               def parse_json_array(raw)
                 return [] if raw.nil? || !raw.is_a?(String) || raw.strip.empty?
 
-                result = Legion::JSON.load(raw)
+                stripped = raw.strip
+                return [] unless stripped.start_with?('[') && stripped.end_with?(']')
+
+                result = Legion::JSON.load(stripped)
                 result.is_a?(Array) ? result : []
               rescue StandardError => e
-                log.error "[trace_persistence] parse_json_array: #{e.message}"
+                log.debug "[trace_persistence] parse_json_array: #{e.message}"
                 []
               end
 
