@@ -403,7 +403,8 @@ module Legion
 
                 parsed = Legion::JSON.load(stripped)
                 parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
-              rescue StandardError
+              rescue StandardError => e
+                log.debug "[trace_persistence] parse_json_or_raw: #{e.message}"
                 raw
               end
 
@@ -415,7 +416,8 @@ module Legion
 
                 result = Legion::JSON.load(stripped)
                 result.is_a?(Array) ? result : []
-              rescue StandardError
+              rescue StandardError => e
+                log.debug "[trace_persistence] parse_json_array: #{e.message}"
                 []
               end
 
