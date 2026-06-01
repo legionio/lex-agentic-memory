@@ -117,9 +117,15 @@ module Legion
               def erase_by_type(type:, store: nil, **)
                 store ||= default_store
                 type = type.to_sym
-                traces = store.retrieve_by_type(type, min_strength: 0.0, limit: 100_000)
-                count = traces.size
-                traces.each { |t| store.delete(t[:trace_id]) }
+
+                count = if store.respond_to?(:batch_delete_by_type)
+                          store.batch_delete_by_type(type)
+                        else
+                          traces = store.retrieve_by_type(type, min_strength: 0.0, limit: 100_000)
+                          traces.each { |t| store.delete(t[:trace_id]) }
+                          traces.size
+                        end
+
                 persist_store(store) if count.positive?
                 log.info("[memory] erased #{count} traces of type=#{type}")
                 { erased: count, type: type }

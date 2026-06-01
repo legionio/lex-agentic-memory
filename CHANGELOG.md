@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.39] - 2026-06-01
+### Fixed
+- `ErrorTracer` now guards against infinite recursion — if downstream trace storage triggers error/fatal logging, the `tracing?` thread-local flag prevents re-entry
+- `ErrorTracer` background worker thread now terminates cleanly — `setup` registers an `at_exit` hook, and a new `shutdown` method pushes the `:stop` sentinel to the queue (previously the thread ran forever with no shutdown path)
+- `HotTier.serialize_trace` now preserves all trace fields (was only serializing 9 out of 25+) — adds `base_decay_rate`, `emotional_valence`, `emotional_intensity`, `origin`, `source_agent_id`, `domain_tags`, `associated_traces`, `child_trace_ids`, `reinforcement_count`, `unresolved`, `consolidation_candidate`, `last_decayed`, `created_at`, `encryption_key_id`, `parent_trace_id`
+- `HotTier.deserialize_trace` reconstructs all fields with proper type coercion (arrays via JSON, booleans, integers, symbols, timestamps)
+- `PostgresStore#deserialize_trace` now reads `child_trace_ids` from the DB column instead of hardcoding `[]` — children are no longer silently lost on retrieval
+- `PostgresStore#serialize_trace` now writes `child_trace_ids` to the DB row
+- `PostgresStore#map_update_fields` now maps `child_trace_ids` to the `:child_trace_ids` column (was `nil`, silently dropping partial updates)
+- `PostgresStore#retrieve_by_domain` uses PostgreSQL JSONB `@>` containment operator for exact array-member matching instead of `LIKE` — eliminates full table scans and substring false positives (e.g., `%auth%` matching `oauth`)
+- `Consolidation#erase_by_type` now uses `batch_delete_by_type` on PostgresStore, avoiding loading all matching traces into Ruby memory before deleting one-by-one (O(100k) heap allocation → O(1) SQL delete)
+
 ## [0.1.38] - 2026-05-27
 ### Fixed
 - `PostgresStore#parse_json_or_raw` now requires matching start/end delimiters (`{}`/`[]`) before attempting JSON parse — eliminates 100k+/day error log spam from bracket-prefixed text content (e.g. `[trace_persistence] ...`) that triggered a self-amplifying feedback loop via RabbitMQ logging
