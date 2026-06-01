@@ -36,6 +36,7 @@ RSpec.describe Legion::Extensions::Agentic::Memory::Trace::Helpers::PostgresStor
       String  :parent_trace_id, size: 36
       String  :encryption_key_id
       String  :partition_id
+      String  :child_trace_ids, text: true
       DateTime :created_at
       DateTime :accessed_at
     end

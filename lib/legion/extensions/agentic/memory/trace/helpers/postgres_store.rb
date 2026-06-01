@@ -80,12 +80,22 @@ module Legion
                 []
               end
 
-              # Retrieve traces whose domain_tags column contains the given tag string.
+              # Retrieve traces whose domain_tags JSON array contains the given tag.
+              # Uses PostgreSQL JSON containment operator (@>) when available for exact array-member
+              # matching; falls back to LIKE for other adapters.
               def retrieve_by_domain(tag, min_strength: 0.0, limit: 50)
                 return [] unless db_ready?
 
-                rows = traces_ds
-                       .where(Sequel.like(:domain_tags, "%#{tag}%"))
+                ds = traces_ds
+                if db.adapter_scheme == :postgres
+                  # JSONB @> operator matches exact array elements, not substrings
+                  json_array = ::JSON.dump([tag])
+                  ds = ds.where(Sequel.lit("domain_tags::jsonb @> '#{json_array}'::jsonb"))
+                else
+                  # Fallback: substring match (imprecise but broadly compatible)
+                  ds = ds.where(Sequel.like(:domain_tags, "%#{tag}%"))
+                end
+                rows = ds
                        .where { strength >= min_strength }
                        .order(Sequel.desc(:strength))
                        .limit(limit)
@@ -330,6 +340,7 @@ module Legion
                   parent_trace_id:         sanitize_pg_string(trace[:parent_trace_id]),
                   encryption_key_id:       sanitize_pg_string(trace[:encryption_key_id]),
                   partition_id:            sanitize_pg_string(trace[:partition_id]),
+                  child_trace_ids:         sanitize_pg_string((trace[:child_trace_ids] || []).is_a?(Array) ? Legion::JSON.dump(trace[:child_trace_ids]) : '[]'),
                   created_at:              trace[:created_at] || Time.now.utc,
                   accessed_at:             Time.now.utc
                 }
@@ -360,7 +371,7 @@ module Legion
                   encryption_key_id:       row[:encryption_key_id],
                   associated_traces:       parse_json_array(row[:associations]),
                   parent_trace_id:         row[:parent_trace_id],
-                  child_trace_ids:         [],
+                  child_trace_ids:         parse_json_array(row[:child_trace_ids]),
                   unresolved:              row[:unresolved]              || false,
                   consolidation_candidate: row[:consolidation_candidate] || false
                 }
@@ -372,7 +383,7 @@ module Legion
                   content_payload:   :content,
                   associated_traces: :associations,
                   parent_trace_id:   :parent_trace_id,
-                  child_trace_ids:   nil # not stored as a column
+                  child_trace_ids:   :child_trace_ids
                 }
 
                 fields.each_with_object({}) do |(k, v), row|
@@ -382,7 +393,7 @@ module Legion
                   row[col] = case col
                              when :content
                                sanitize_pg_string(v.is_a?(Hash) ? Legion::JSON.dump(v) : v.to_s)
-                             when :associations
+                             when :associations, :child_trace_ids
                                sanitize_pg_string(v.is_a?(Array) ? Legion::JSON.dump(v) : '[]')
                              when :domain_tags
                                sanitize_pg_string(v.is_a?(Array) ? Legion::JSON.dump(v) : nil)
@@ -392,6 +403,22 @@ module Legion
                                v
                              end
                 end
+              end
+
+              # Delete all traces of a given type in a single SQL statement,
+              # avoiding loading rows into Ruby memory.
+              def batch_delete_by_type(trace_type)
+                return 0 unless db_ready?
+
+                ids = traces_ds
+                      .where(trace_type: trace_type.to_s)
+                      .select_map(:trace_id)
+
+                ids.each { |tid| delete(tid) }
+                ids.size
+              rescue StandardError => e
+                log_warn("batch_delete_by_type failed: #{e.message}")
+                0
               end
 
               def parse_json_or_raw(raw)

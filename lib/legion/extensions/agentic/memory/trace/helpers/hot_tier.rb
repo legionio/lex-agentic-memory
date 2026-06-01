@@ -81,33 +81,100 @@ module Legion
               end
 
               # Serialize a trace hash to a string-only flat hash suitable for Redis HSET.
+              # All fields are preserved as strings; arrays/hashes are JSON-encoded.
               def serialize_trace(trace)
+                payload = trace[:content_payload] || trace[:content]
                 {
-                  'trace_id'        => trace[:trace_id].to_s,
-                  'trace_type'      => trace[:trace_type].to_s,
-                  'content_payload' => trace[:content_payload].to_s,
-                  'strength'        => trace[:strength].to_s,
-                  'peak_strength'   => trace[:peak_strength].to_s,
-                  'confidence'      => trace[:confidence].to_s,
-                  'storage_tier'    => 'hot',
-                  'partition_id'    => trace[:partition_id].to_s,
-                  'last_reinforced' => (trace[:last_reinforced] || Time.now).to_s
+                  'trace_id'                => trace[:trace_id].to_s,
+                  'trace_type'              => trace[:trace_type].to_s,
+                  'content_payload'         => payload.is_a?(Hash) || payload.is_a?(Array) ? Legion::JSON.dump(payload) : payload.to_s,
+                  'strength'                => trace[:strength].to_s,
+                  'peak_strength'           => trace[:peak_strength].to_s,
+                  'base_decay_rate'         => trace[:base_decay_rate].to_s,
+                  'confidence'              => trace[:confidence].to_s,
+                  'emotional_valence'       => trace[:emotional_valence].to_s,
+                  'emotional_intensity'     => trace[:emotional_intensity].to_s,
+                  'storage_tier'            => 'hot',
+                  'partition_id'            => trace[:partition_id].to_s,
+                  'origin'                  => trace[:origin].to_s,
+                  'source_agent_id'         => trace[:source_agent_id].to_s,
+                  'encryption_key_id'       => trace[:encryption_key_id].to_s,
+                  'parent_trace_id'         => trace[:parent_trace_id].to_s,
+                  'domain_tags'             => trace[:domain_tags].is_a?(Array) ? Legion::JSON.dump(trace[:domain_tags]) : '[]',
+                  'associated_traces'       => trace[:associated_traces].is_a?(Array) ? Legion::JSON.dump(trace[:associated_traces]) : '[]',
+                  'child_trace_ids'         => trace[:child_trace_ids].is_a?(Array) ? Legion::JSON.dump(trace[:child_trace_ids]) : '[]',
+                  'reinforcement_count'     => trace[:reinforcement_count].to_s,
+                  'unresolved'              => trace[:unresolved].to_s,
+                  'consolidation_candidate' => trace[:consolidation_candidate].to_s,
+                  'last_reinforced'         => (trace[:last_reinforced] || Time.now).to_s,
+                  'last_decayed'            => trace[:last_decayed].to_s,
+                  'created_at'              => trace[:created_at].to_s
                 }
               end
 
               # Deserialize a Redis string-hash back to a typed trace hash.
               def deserialize_trace(data)
                 {
-                  trace_id:        data['trace_id'],
-                  trace_type:      data['trace_type']&.to_sym,
-                  content_payload: data['content_payload'],
-                  strength:        data['strength']&.to_f,
-                  peak_strength:   data['peak_strength']&.to_f,
-                  confidence:      data['confidence']&.to_f,
-                  storage_tier:    :hot,
-                  partition_id:    data['partition_id'],
-                  last_reinforced: data['last_reinforced']
+                  trace_id:                data['trace_id'],
+                  trace_type:              data['trace_type']&.to_sym,
+                  content_payload:         parse_json_or_string(data['content_payload']),
+                  content:                 parse_json_or_string(data['content_payload']),
+                  strength:                data['strength']&.to_f,
+                  peak_strength:           data['peak_strength']&.to_f,
+                  base_decay_rate:         data['base_decay_rate']&.to_f,
+                  confidence:              data['confidence']&.to_f,
+                  emotional_valence:       data['emotional_valence'].to_f,
+                  emotional_intensity:     data['emotional_intensity'].to_f,
+                  storage_tier:            :hot,
+                  partition_id:            presence(data['partition_id']),
+                  origin:                  presence(data['origin'])&.to_sym,
+                  source_agent_id:         presence(data['source_agent_id']),
+                  encryption_key_id:       presence(data['encryption_key_id']),
+                  parent_trace_id:         presence(data['parent_trace_id']),
+                  domain_tags:             parse_json_array(data['domain_tags']),
+                  associated_traces:       parse_json_array(data['associated_traces']),
+                  child_trace_ids:         parse_json_array(data['child_trace_ids']),
+                  reinforcement_count:     data['reinforcement_count'].to_i,
+                  unresolved:              data['unresolved'] == 'true',
+                  consolidation_candidate: data['consolidation_candidate'] == 'true',
+                  last_reinforced:         data['last_reinforced'],
+                  last_decayed:            presence(data['last_decayed']),
+                  created_at:              presence(data['created_at'])
                 }
+              end
+
+              # Parse a JSON array string safely; returns [] on failure.
+              def parse_json_array(raw)
+                return [] if raw.nil? || !raw.is_a?(String) || raw.strip.empty?
+
+                parsed = Legion::JSON.load(raw)
+                parsed.is_a?(Array) ? parsed : []
+              rescue StandardError => e
+                log.debug "[trace_persistence] parse_json_array: #{e.message}"
+                []
+              end
+
+              # Attempt to parse JSON, fall back to raw string.
+              def parse_json_or_string(raw)
+                return raw unless raw.is_a?(String)
+
+                stripped = raw.strip
+                return raw unless (stripped.start_with?('{') && stripped.end_with?('}')) ||
+                                  (stripped.start_with?('[') && stripped.end_with?(']'))
+
+                parsed = Legion::JSON.load(stripped)
+                parsed.is_a?(Hash) || parsed.is_a?(Array) ? parsed : raw
+              rescue StandardError => e
+                log.debug "[trace_persistence] parse_json_or_string: #{e.message}"
+                raw
+              end
+
+              # Return value only if it is a non-empty string.
+              def presence(value)
+                return nil unless value.is_a?(String)
+
+                stripped = value.strip
+                stripped.empty? ? nil : stripped
               end
             end
           end

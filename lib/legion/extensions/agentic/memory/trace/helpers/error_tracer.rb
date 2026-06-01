@@ -25,6 +25,7 @@ module Legion
                   @worker.name  = 'legion-error-tracer'
                   wrap_logging_methods
                   @active = true
+                  register_shutdown_hook
                   Legion::Logging.info '[memory] ErrorTracer active — errors/fatals will become episodic traces'
                 end
 
@@ -32,7 +33,24 @@ module Legion
                   @active == true
                 end
 
+                # Gracefully shut down the background worker and unregister the at_exit hook.
+                def shutdown
+                  return unless @active
+
+                  @write_queue&.push(:stop)
+                  @worker&.join(5) # wait up to 5 seconds for clean exit
+                  @active = false
+                  Legion::Logging.info '[memory] ErrorTracer shut down'
+                rescue StandardError
+                  @active = false
+                end
+
                 private
+
+                def register_shutdown_hook
+                  @shutdown_hook = proc { ErrorTracer.shutdown }
+                  at_exit(&@shutdown_hook)
+                end
 
                 def drain_queue
                   loop do
@@ -54,43 +72,55 @@ module Legion
                   Legion::Logging.define_singleton_method(:error) do |message = nil, &block|
                     message = block.call if message.nil? && block
                     original_error.call(message)
-                    ErrorTracer.send(:record_trace, message, :error) if message.is_a?(String)
+                    ErrorTracer.send(:record_trace, message, :error) if message.is_a?(String) && !ErrorTracer.send(:tracing?)
                   end
 
                   Legion::Logging.define_singleton_method(:fatal) do |message = nil, &block|
                     message = block.call if message.nil? && block
                     original_fatal.call(message)
-                    ErrorTracer.send(:record_trace, message, :fatal) if message.is_a?(String)
+                    ErrorTracer.send(:record_trace, message, :fatal) if message.is_a?(String) && !ErrorTracer.send(:tracing?)
                   end
+                end
+
+                def tracing?
+                  Thread.current[:error_tracer_active]
                 end
 
                 def record_trace(message, level)
                   return unless message.is_a?(String) && !message.empty?
 
-                  now = Time.now.utc
-                  key = "#{level}:#{message[0..100]}"
+                  # Guard against infinite recursion if downstream logging triggers error/fatal
+                  return if tracing?
 
-                  @recent_mutex.synchronize do
-                    return if @recent[key] && (now - @recent[key]) < DEBOUNCE_WINDOW
+                  Thread.current[:error_tracer_active] = true
+                  begin
+                    now = Time.now.utc
+                    key = "#{level}:#{message[0..100]}"
 
-                    @recent[key] = now
-                    @recent.delete_if { |_, t| (now - t) > DEBOUNCE_WINDOW } if @recent.size > 500
+                    @recent_mutex.synchronize do
+                      return if @recent[key] && (now - @recent[key]) < DEBOUNCE_WINDOW
+
+                      @recent[key] = now
+                      @recent.delete_if { |_, t| (now - t) > DEBOUNCE_WINDOW } if @recent.size > 500
+                    end
+
+                    component = message.match(/\A\[([^\]]+)\]/)&.captures&.first || 'unknown'
+                    valence   = level == :fatal ? FATAL_VALENCE : ERROR_VALENCE
+                    intensity = level == :fatal ? FATAL_INTENSITY : ERROR_INTENSITY
+
+                    @write_queue.push(
+                      type:                :episodic,
+                      content_payload:     message,
+                      domain_tags:         ['error', component.downcase],
+                      origin:              :direct_experience,
+                      emotional_valence:   valence,
+                      emotional_intensity: intensity,
+                      unresolved:          true,
+                      confidence:          0.9
+                    )
+                  ensure
+                    Thread.current[:error_tracer_active] = false
                   end
-
-                  component = message.match(/\A\[([^\]]+)\]/)&.captures&.first || 'unknown'
-                  valence   = level == :fatal ? FATAL_VALENCE : ERROR_VALENCE
-                  intensity = level == :fatal ? FATAL_INTENSITY : ERROR_INTENSITY
-
-                  @write_queue.push(
-                    type:                :episodic,
-                    content_payload:     message,
-                    domain_tags:         ['error', component.downcase],
-                    origin:              :direct_experience,
-                    emotional_valence:   valence,
-                    emotional_intensity: intensity,
-                    unresolved:          true,
-                    confidence:          0.9
-                  )
                 rescue StandardError
                   nil
                 end
