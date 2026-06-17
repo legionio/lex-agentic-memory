@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.40] - 2026-06-17
+### Fixed
+- **Critical performance fix:** Trace store `snapshot_dirty_state` no longer serializes ALL traces to JSON on every flush — replaced boolean `@traces_dirty` flag with per-trace `@dirty_trace_ids` Set so only modified traces are serialized (O(changed) instead of O(total))
+- `load_from_local` no longer re-serializes every trace on boot — stores raw DB rows directly in `@persisted_trace_rows`
+- `persist_dirty_traces` now handles explicit deletion tracking via `@deleted_trace_ids` Set
+- Eliminates 97%+ single-core CPU usage caused by `decay_cycle` triggering full-store JSON serialization every 60 seconds
+
 ## [0.1.39] - 2026-06-01
 ### Fixed
 - `ErrorTracer` now guards against infinite recursion — if downstream trace storage triggers error/fatal logging, the `tracing?` thread-local flag prevents re-entry
