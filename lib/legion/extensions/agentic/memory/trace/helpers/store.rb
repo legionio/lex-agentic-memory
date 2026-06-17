@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'set'
 
 module Legion
   module Extensions
@@ -22,7 +23,8 @@ module Legion
                 @traces = {}
                 @associations = Hash.new { |h, k| h[k] = Hash.new(0) }
                 @partition_id = partition_id || resolve_partition_id
-                @traces_dirty = false
+                @dirty_trace_ids = Set.new
+                @deleted_trace_ids = Set.new
                 @associations_dirty = false
                 @persisted_trace_rows = {}
                 load_from_local
@@ -32,7 +34,7 @@ module Legion
                 persisted_trace = Helpers::Trace.normalize_trace_affect(trace)
                 persisted_trace[:partition_id] ||= @partition_id
                 @mutex.synchronize do
-                  @traces_dirty = true if @traces[persisted_trace[:trace_id]] != persisted_trace
+                  @dirty_trace_ids << persisted_trace[:trace_id]
                   @traces[persisted_trace[:trace_id]] = persisted_trace
                 end
                 persisted_trace[:trace_id]
@@ -50,7 +52,10 @@ module Legion
                   removed_links = @associations.delete(trace_id)
                   @associations.each_value { |links| links.delete(trace_id) }
 
-                  @traces_dirty = true if removed_trace
+                  if removed_trace
+                    @dirty_trace_ids.delete(trace_id)
+                    @deleted_trace_ids << trace_id
+                  end
                   @associations_dirty = true if removed_trace || removed_links
                 end
               end
@@ -92,8 +97,10 @@ module Legion
                   @associations_dirty = true
 
                   threshold = Helpers::Trace::COACTIVATION_THRESHOLD
-                  @traces_dirty = true if @associations[trace_id_a][trace_id_b] >= threshold &&
-                                          link_traces(trace_id_a, trace_id_b)
+                  if @associations[trace_id_a][trace_id_b] >= threshold && link_traces(trace_id_a, trace_id_b)
+                    @dirty_trace_ids << trace_id_a
+                    @dirty_trace_ids << trace_id_b
+                  end
                 end
               end
 
@@ -128,7 +135,8 @@ module Legion
                 @mutex.synchronize do
                   @traces = snapshot
                   @associations = Hash.new { |h, k| h[k] = Hash.new(0) }
-                  @traces_dirty = true
+                  @dirty_trace_ids = Set.new(@traces.keys)
+                  @deleted_trace_ids = Set.new
                   @associations_dirty = true
                 end
                 flush
@@ -183,27 +191,41 @@ module Legion
               end
 
               def snapshot_dirty_state
-                traces_snapshot, associations_snapshot, trace_rows_snapshot, trace_changes, associations_dirty = @mutex.synchronize do
-                  ts = @traces.transform_values(&:dup)
-                  as = @associations.each_with_object({}) { |(tid, targets), memo| memo[tid] = targets.dup }
-                  trs = ts.transform_values { |trace| serialize_trace_for_db(trace) }
-                  changed_trace_ids = trs.each_key.reject { |trace_id| trs[trace_id] == @persisted_trace_rows[trace_id] }
-                  trace_changes = { dirty: @traces_dirty || changed_trace_ids.any?, changed_ids: changed_trace_ids }
-                  [ts, as, trs, trace_changes, @associations_dirty]
-                end
-                return nil unless trace_changes[:dirty] || associations_dirty
+                @mutex.synchronize do
+                  dirty_ids = @dirty_trace_ids.to_a
+                  deleted_ids = @deleted_trace_ids.to_a
+                  associations_dirty = @associations_dirty
 
-                [traces_snapshot, associations_snapshot, trace_rows_snapshot, trace_changes, associations_dirty]
+                  return nil if dirty_ids.empty? && deleted_ids.empty? && !associations_dirty
+
+                  dirty_rows = dirty_ids.each_with_object({}) do |trace_id, h|
+                    trace = @traces[trace_id]
+                    h[trace_id] = serialize_trace_for_db(trace) if trace
+                  end
+
+                  trace_rows_snapshot = @persisted_trace_rows.merge(dirty_rows)
+                  deleted_ids.each { |id| trace_rows_snapshot.delete(id) }
+
+                  traces_snapshot = @traces.transform_values(&:dup)
+                  as = @associations.each_with_object({}) { |(tid, targets), memo| memo[tid] = targets.dup }
+                  trace_changes = { dirty: true, changed_ids: dirty_ids, deleted_ids: deleted_ids }
+
+                  [traces_snapshot, as, trace_rows_snapshot, trace_changes, associations_dirty]
+                end
               end
 
               def persist_dirty_traces(db, trace_rows_snapshot, trace_changes, stale_ids)
-                return unless trace_changes[:dirty] || !stale_ids.empty?
+                changed_ids = trace_changes[:changed_ids] || []
+                deleted_ids = trace_changes[:deleted_ids] || []
+                all_removals = (stale_ids + deleted_ids).uniq
+                return if changed_ids.empty? && all_removals.empty?
 
                 ds = db[:memory_traces]
-                trace_changes[:changed_ids].each do |trace_id|
-                  ds.insert_conflict(:replace).insert(trace_rows_snapshot.fetch(trace_id))
+                changed_ids.each do |trace_id|
+                  row = trace_rows_snapshot[trace_id]
+                  ds.insert_conflict(:replace).insert(row) if row
                 end
-                db[:memory_traces].where(trace_id: stale_ids).delete unless stale_ids.empty?
+                db[:memory_traces].where(trace_id: all_removals).delete unless all_removals.empty?
               end
 
               def persist_dirty_associations(db, associations_snapshot, scoped_trace_ids, memory_trace_ids, stale_ids, dirty)
@@ -232,7 +254,8 @@ module Legion
 
               def clear_dirty_flags(trace_rows_snapshot)
                 @mutex.synchronize do
-                  @traces_dirty = false
+                  @dirty_trace_ids.clear
+                  @deleted_trace_ids.clear
                   @associations_dirty = false
                   @persisted_trace_rows = trace_rows_snapshot
                 end
@@ -246,12 +269,13 @@ module Legion
 
                 db[:memory_traces].where(partition_id: @partition_id).each do |row|
                   @traces[row[:trace_id]] = deserialize_trace_from_db(row)
+                  @persisted_trace_rows[row[:trace_id]] = row.dup
                 end
 
                 load_local_associations(db)
 
-                @persisted_trace_rows = @traces.transform_values { |trace| serialize_trace_for_db(trace) }
-                @traces_dirty = false
+                @dirty_trace_ids = Set.new
+                @deleted_trace_ids = Set.new
                 @associations_dirty = false
               end
 
